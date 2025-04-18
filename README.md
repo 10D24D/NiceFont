@@ -23,7 +23,7 @@
 ### 安装
 
 1. 安装 [Tampermonkey](https://www.tampermonkey.net/) 或 [Greasemonkey](https://www.greasespot.net/)。
-2. 访问 [NiceFont 脚本页面](https://greasyfork.org)。
+2. 访问 [NiceFont 脚本页面](https://greasyfork.org/zh-CN/scripts/533232-nicefont)。
 3. 点击“安装”按钮，脚本会自动添加到您的油猴脚本管理器中。
 4. 安装后，刷新网页即可开始使用。
 

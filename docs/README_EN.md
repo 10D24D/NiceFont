@@ -23,7 +23,7 @@
 ### Installation
 
 1. Install [Tampermonkey](https://www.tampermonkey.net/) or [Greasemonkey](https://www.greasespot.net/).
-2. Visit the [NiceFont script page](https://greasyfork.org).
+2. Visit the [NiceFont script page](https://greasyfork.org/en/scripts/533232-nicefont).
 3. Click the "Install" button, and the script will be automatically added to your userscript manager.
 4. Once installed, refresh your webpage, and the script will begin working.
 

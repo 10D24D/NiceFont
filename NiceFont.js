@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NiceFont
 // @namespace    https://github.com/10D24D/NiceFont/
-// @version      1.0
+// @version      1.1
 // @description  NiceFont 主打让字体更“耐视”好看。支持手动、定时、动态的调整每个网页的字体样式，包括字体大小、字体类型，并且记住它们！
 // @description:en NiceFont focuses on making fonts more "durable" and good-looking. Support manual, timed and dynamic adjustment of the font style of each web page, including font size and font type, and remember them!
 // @author       DD1024z
@@ -12,6 +12,8 @@
 // @grant        GM_unregisterMenuCommand
 // @grant        GM_getValue
 // @grant        GM_setValue
+// @downloadURL https://update.greasyfork.org/scripts/533232/NiceFont.user.js
+// @updateURL https://update.greasyfork.org/scripts/533232/NiceFont.meta.js
 // ==/UserScript==
 
 (function () {
@@ -291,15 +293,22 @@
             }
 
             const baseFontSize = parseFloat(convertToPx(el, el.getAttribute('data-default-fontsize')));
+
             if (!isNaN(baseFontSize)) {
                 const newFontSize = baseFontSize + increment;
                 el.style.fontSize = `${newFontSize}px`;
             }
 
-            // 设置字体类型.只更新需要更新的 fontFamily
+            // 设置字体类型，只更新需要更新的 fontFamily
             if (currentFontFamily !== 'auto' && currentFontFamily !== 'none' && el.style.fontFamily !== currentFontFamily) {
                 el.style.fontFamily = currentFontFamily;
             }
+        }
+
+        // 支持处理 Shadow DOM 中的字体调整。如果有 shadowRoot，递归处理 shadow DOM 中的元素
+        if (el.shadowRoot) {
+            const shadowChildren = el.shadowRoot.querySelectorAll('*');
+            shadowChildren.forEach(child => applyFontSizeRecursively(child, increment));
         }
 
         // 遍历子元素，异步更新字体大小
@@ -307,6 +316,7 @@
             requestAnimationFrame(() => applyFontSizeRecursively(child, increment));
         });
     }
+
 
     // 批量应用字体调整
     function applyFontFamilyToPage(fontFamily) {
@@ -348,16 +358,20 @@
 
     // 获取支持的字体列表
     function getSupportedFonts() {
-        const testString = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890';
-        const testElement = document.createElement('span');
-        testElement.textContent = testString;
         const fontFamilies = [
             'auto', 'Arial', 'cursive', 'emoji', 'fangsong', 'fantasy', 'math', 'monospace', 'none', 'sans-serif', 'serif',
             'system-ui', 'ui-monospace', 'ui-rounded', 'ui-sans-serif', 'ui-serif', '-webkit-body',
             'inherit', 'initial', 'revert', 'revert-layer', 'unset',
             'Verdana', 'Helvetica', 'Tahoma', 'Times New Roman', 'Georgia', 'Courier New', 'Comic Sans MS',
         ];
+        // 直接返回从浏览器字体库中记录下的字体家族
+        return fontFamilies;
 
+        /*
+        const testString = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890';
+        const testElement = document.createElement('span');
+        testElement.textContent = testString;
+        
         let supportedFonts = [];
 
         fontFamilies.forEach(font => {
@@ -371,6 +385,7 @@
         });
 
         return supportedFonts;
+        */
     }
 
 })();
