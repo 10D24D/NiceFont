@@ -3,80 +3,67 @@
 
 ## NiceFont - Font Adjustment Script
 
-### UI
+### ✨ Introduction
+
+**NiceFont** is a Tampermonkey script designed to make fonts on web pages clearer and more comfortable to read 📝. It supports dynamic, timed, and manual adjustments of font size and type, and remembers these settings, applying them automatically after page refresh 🔄.
+
+### 🆕 Changelog
+
+- **v1.2**: Added support for adjusting fonts in iFrames, solving font adjustment issues on certain websites (e.g., DingTalk online documents) 📑; updated README documentation 📖; added language support 🌍.
+- **v1.1**: Fixed issues where supported font families were not being applied 🛠️; added support for adjusting fonts in Shadow DOMs, solving font adjustment issues on certain websites (e.g., Bilibili) 🎬; updated README documentation 📘.
+- **v1.0**: Initial release 🚀, supporting font size adjustment, font type selection, dynamic adjustments, timed adjustments, and saved settings 💾.
+
+### 🎨 Interface Preview
 
 <img src="/static/ui_en.png" width="350"></img>
 
-### Description
+### 🔧 Main Features
 
-**NiceFont** is a userscript designed to make fonts on webpages more "durable" and aesthetically pleasing. This script supports manual, timed, and dynamic adjustments of font size and font type, and it remembers these settings, so they persist even after refreshing the page.
+- **Font Adjustment**: Adjust font size and type freely 🖋️.
+- **Dynamic Adjustment**: Automatically adjusts fonts when page content changes 🔄.
+- **Timed Adjustment**: Set an interval to adjust the font periodically ⏲️.
+- **Language Support**: Supports both Simplified Chinese and English 🌏.
+- **Saved Settings**: All font adjustment settings are saved and applied automatically after a page refresh 💾.
 
-### Features
+### 🚀 Installation Steps
 
-- **Font Adjustment**: Users can freely adjust the font size and type.
-- **Dynamic Adjustment**: Fonts automatically adjust when the content of the page changes.
-- **Timed Adjustment**: Set an interval to adjust fonts at regular intervals.
-- **Language Support**: The script supports both English and Simplified Chinese.
-- **Memory Settings**: All font adjustments are saved, and they are automatically applied after refreshing the page.
-- **Multiple Font Support**: You can select different fonts, and the script will automatically detect supported fonts.
+1. Install [Tampermonkey](https://www.tampermonkey.net/) or [Greasemonkey](https://www.greasespot.net/) 🛠️.
+2. Visit the [NiceFont script page](https://greasyfork.org/en/scripts/533232-nicefont) 🌐.
+3. Click the "Install" button to automatically add the script to your script manager ⚙️.
+4. Refresh the webpage to start using the script 🔄.
 
-### Installation
+### 📝 Usage Guide
 
-1. Install [Tampermonkey](https://www.tampermonkey.net/) or [Greasemonkey](https://www.greasespot.net/).
-2. Visit the [NiceFont script page](https://greasyfork.org/en/scripts/533232-nicefont).
-3. Click the "Install" button, and the script will be automatically added to your userscript manager.
-4. Once installed, refresh your webpage, and the script will begin working.
+- **Adjust Font Size**: Increase, decrease, or reset the font size via the menu 📏.
+- **Select Font Type**: Choose from a variety of font types, including common system fonts 🖋️.
+- **Switch Language**: Toggle between Simplified Chinese and English in the menu 🔄.
+- **Dynamic Adjustment**: Fonts are automatically adjusted when the page content changes, ideal for frequently updated pages 🔄.
+- **Timed Adjustment**: Set an interval to periodically adjust the font ⏲️.
 
-### Usage Instructions
+### 📑 Menu Features
 
-- **Adjust Font Size**: Use the menu to increase, decrease, or reset the font size.
-- **Set Font Type**: Choose from available system fonts (such as Arial, Verdana, Courier, etc.).
-- **Switch Language**: The script supports English and Simplified Chinese, and you can switch between languages from the menu.
-- **Dynamic Font Adjustment**: Fonts will automatically adjust when new content is added to the page.
-- **Timed Font Adjustment**: Set an interval to adjust the font at regular intervals.
+- **Increase Font Size**: Click to increase the font size, with customizable increment 🔼.
+- **Decrease Font Size**: Click to decrease the font size, with customizable increment 🔽.
+- **Reset to Default Font**: Restore the original font 🔁.
+- **Reapply Font Changes**: Reapply the font adjustments ♻️.
+- **Set Font Increment**: Set the increment for each font adjustment (default is 1px) ⚙️.
+- **Set Font Type**: Choose and set the font type for the webpage 🖋️.
+- **Toggle Dynamic Adjustment**: Enable or disable dynamic font adjustment 👁️.
+- **Toggle Timed Adjustment**: Set the interval for timed font adjustments ⏱️.
+- **Switch Language**: Toggle between Simplified Chinese and English menu languages 🌍.
 
-### Menu Features
+### 📚 Contact
 
-- **Increase Font**: Click to increase the font size, with a customizable increment.
-- **Decrease Font**: Click to decrease the font size, with a customizable increment.
-- **Reset Font Size**: Restore the default font size.
-- **Reapply Font Changes**: Reapply the font size and style changes to the page.
-- **Set Font Increment**: Set the font size increment (default is 1px).
-- **Set Font Type**: Select and apply a font family for the page.
-- **Toggle Dynamic Font Adjustment**: Enable or disable dynamic font adjustment based on page content changes.
-- **Toggle Timed Font Adjustment**: Set the time interval for applying font changes automatically.
-- **Switch Language**: Switch between English and Simplified Chinese menu language.
+- **GitHub**: [https://github.com/10D24D/NiceFont](https://github.com/10D24D/NiceFont) 📍
 
-### Configuration
+### 🤝 How to Contribute
 
-- **Font Increment**: Controls how much the font size increases or decreases during each adjustment. Default is 1px.
-- **Timed Adjustment**: Set the time interval for applying font changes automatically (in seconds).
-- **Font Family**: Select a font family for the page. You can customize this or use the default font.
-- **Dynamic Adjustment**: Enable or disable dynamic font adjustments whenever page content changes.
+We welcome code contributions and suggestions! Please submit your feedback via Issues or directly open a Pull Request. If you can, please leave a star ⭐ or a positive review to support this project!
 
-### Supported Fonts
+### 📝 License
 
-- **System Fonts**: Arial, Verdana, Helvetica, Times New Roman, etc.
-- **Other Fonts**: Supports commonly used web fonts like Courier New, Comic Sans MS, Georgia, and more.
+This project is licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). Please comply with the terms of the license when using, modifying, or distributing the code 📜.
 
-### Notes
+### ⚠️ Disclaimer
 
-1. **Performance**: Enabling dynamic font adjustment may cause delays in loading complex pages, especially when page content is frequently changing.
-2. **Refresh Required**: Some settings, such as changing font type, may require refreshing the page to take effect.
-3. **Compatibility**: The script works in most modern browsers, but there might be compatibility issues on some specific browsers or with certain page structures.
-
-### Changelog
-
-- **v1.2** : -1. Support font adjustment in iframes to solve the problem that some websites (such as DingTalk Online documents) cannot adjust fonts. -2. Modify the README document; -3. Add language support for script names and descriptions.
-- **v1.1** : -1. Resolved the issue where supported font families could not be applied; -2. Support handling font adjustments in the Shadow DOM to solve the problem that some websites (such as bilibili) are unable to adjust fonts;
-- **v1.0**: Initial version with support for font size adjustment, font type selection, dynamic adjustment, timed adjustment, and memory settings.
-
-### Contact
-
-- **GitHub**: https://github.com/10D24D/NiceFont
-
-------
-
-### Disclaimer
-
-This script is an open-source project and is free for everyone to use. By using this script, you agree to take full responsibility for any risks that may arise from its use. The developers are not responsible for any losses or issues caused by using this script.
+This script is an open-source project and is free for everyone to use. By using this script, you agree to take responsibility for any risks associated with it. The developers are not responsible for any losses or issues caused by using this script ⚠️.
