@@ -3,6 +3,10 @@
 
 ## NiceFont - Font Adjustment Script
 
+### UI
+
+<img src="/static/ui_en.png" width="350"></img>
+
 ### Description
 
 **NiceFont** is a userscript designed to make fonts on webpages more "durable" and aesthetically pleasing. This script supports manual, timed, and dynamic adjustments of font size and font type, and it remembers these settings, so they persist even after refreshing the page.
