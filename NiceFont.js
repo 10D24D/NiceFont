@@ -1,9 +1,18 @@
 // ==UserScript==
 // @name         NiceFont
+// @name:zh-CN         NiceFont（耐视字体）
+// @name:zh-TW         NiceFont（耐視字體）
+// @name:en            NiceFont
+// @name:ko            좋은 글꼴（NiceFont）
+// @name:ja            いいフォント（NiceFont）
 // @namespace    https://github.com/10D24D/NiceFont/
-// @version      1.1
+// @version      1.2
 // @description  NiceFont 主打让字体更“耐视”好看。支持手动、定时、动态的调整每个网页的字体样式，包括字体大小、字体类型，并且记住它们！
 // @description:en NiceFont focuses on making fonts more "durable" and good-looking. Support manual, timed and dynamic adjustment of the font style of each web page, including font size and font type, and remember them!
+// @description:zh-CN NiceFont 主打让字体更“耐视”好看。支持手动、定时、动态的调整每个网页的字体样式，包括字体大小、字体类型，并且记住它们！
+// @description:zh-TW NiceFont 主打讓字體更“耐視”好看。支持手動、定時、動態的調整每個網頁的字體樣式，包括字體大小、字體類型，並且記住它們！
+// @description:ko NiceFont는 웹 페이지에서 글꼴을 "내구성이 좋고 보기 좋게" 만들어 주는 기능을 제공합니다. 수동, 타이머, 동적 방식으로 각 웹 페이지의 글꼴 스타일을 조정할 수 있으며, 글꼴 크기 및 종류를 기억합니다!
+// @description:ja NiceFontは、ウェブページのフォントを「耐久性があり、美しく」することを目指しています。手動、タイマー、動的に各ウェブページのフォントスタイルを調整でき、フォントサイズやフォントタイプも記憶されます！
 // @author       DD1024z
 // @match        *://*/*
 // @icon         https://raw.githubusercontent.com/10D24D/NiceFont/main/static/logo.png
@@ -93,8 +102,13 @@
 
     let observer = null;
     let timer = null;
-    let menuHandles = {}; // 用来存储菜单项的句柄
-    let supportFonts = getSupportedFonts();
+    let menuHandles = {}; // 用来存储油猴菜单项
+    const supportFonts = [
+        'auto', 'Arial', 'cursive', 'emoji', 'fangsong', 'fantasy', 'math', 'monospace', 'none', 'sans-serif', 'serif',
+        'system-ui', 'ui-monospace', 'ui-rounded', 'ui-sans-serif', 'ui-serif', '-webkit-body',
+        'inherit', 'initial', 'revert', 'revert-layer', 'unset',
+        'Verdana', 'Helvetica', 'Tahoma', 'Times New Roman', 'Georgia', 'Courier New', 'Comic Sans MS',
+    ];
 
     // 更新菜单命令
     updateMenuCommands();
@@ -305,6 +319,19 @@
             }
         }
 
+        // 处理 iframe 中的 document.body
+        if (el.tagName === 'IFRAME') {
+            try {
+                const iframeDocument = el.contentDocument || el.contentWindow.document;
+                if (iframeDocument) {
+                    applyFontSizeRecursively(iframeDocument.body, increment);
+                    applyFontFamilyToPage(iframeDocument.body, currentFontFamily);
+                }
+            } catch (e) {
+                console.warn('无法访问 iframe 内容', e);
+            }
+        }
+
         // 支持处理 Shadow DOM 中的字体调整。如果有 shadowRoot，递归处理 shadow DOM 中的元素
         if (el.shadowRoot) {
             const shadowChildren = el.shadowRoot.querySelectorAll('*');
@@ -317,13 +344,28 @@
         });
     }
 
-
     // 批量应用字体调整
-    function applyFontFamilyToPage(fontFamily) {
-        document.body.style.fontFamily = fontFamily;
-        Array.from(document.body.getElementsByTagName('*')).forEach(el => {
-            el.style.fontFamily = fontFamily;
+    function applyFontFamilyToPage(el, fontFamily) {
+        if (el.nodeType !== Node.ELEMENT_NODE) return;
+        el.style.fontFamily = fontFamily;
+        Array.from(el.getElementsByTagName('*')).forEach(child => {
+            child.style.fontFamily = fontFamily;
         });
+
+        // 对 iframe 中的内容应用相同字体
+        if (el.tagName === 'IFRAME') {
+            try {
+                const iframeDocument = el.contentDocument || el.contentWindow.document;
+                if (iframeDocument) {
+                    iframeDocument.body.style.fontFamily = fontFamily;
+                    Array.from(iframeDocument.body.getElementsByTagName('*')).forEach(child => {
+                        child.style.fontFamily = fontFamily;
+                    });
+                }
+            } catch (e) {
+                console.warn('无法访问 iframe 内容', e);
+            }
+        }
     }
 
     // 重置字体大小
@@ -339,7 +381,7 @@
         Array.from(el.children).forEach(child => resetFontSize(child));
     }
 
-    // 转换字体单位（支持 px, em, rem）
+    // 转换字体单位（支持 px, em, rem, pt）
     function convertToPx(el, fontSize) {
         const rootFontSize = parseFloat(window.getComputedStyle(document.documentElement).fontSize);
         if (fontSize.includes("rem")) {
@@ -353,39 +395,19 @@
             const parentFontSize = parseFloat(window.getComputedStyle(el.parentElement).fontSize);
             return (parseFloat(fontSize) / 100) * parentFontSize;
         }
-        return fontSize;
-    }
-
-    // 获取支持的字体列表
-    function getSupportedFonts() {
-        const fontFamilies = [
-            'auto', 'Arial', 'cursive', 'emoji', 'fangsong', 'fantasy', 'math', 'monospace', 'none', 'sans-serif', 'serif',
-            'system-ui', 'ui-monospace', 'ui-rounded', 'ui-sans-serif', 'ui-serif', '-webkit-body',
-            'inherit', 'initial', 'revert', 'revert-layer', 'unset',
-            'Verdana', 'Helvetica', 'Tahoma', 'Times New Roman', 'Georgia', 'Courier New', 'Comic Sans MS',
-        ];
-        // 直接返回从浏览器字体库中记录下的字体家族
-        return fontFamilies;
-
-        /*
-        const testString = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890';
-        const testElement = document.createElement('span');
-        testElement.textContent = testString;
-        
-        let supportedFonts = [];
-
-        fontFamilies.forEach(font => {
-            testElement.style.fontFamily = font;
-            document.body.appendChild(testElement);
-            const isSupported = window.getComputedStyle(testElement).fontFamily.indexOf(font) !== -1;
-            if (isSupported) {
-                supportedFonts.push(font);
-            }
-            document.body.removeChild(testElement);
-        });
-
-        return supportedFonts;
-        */
+        if (fontSize.includes("pt")) {
+            // 1pt = 1.3333px
+            return parseFloat(fontSize) * 1.3333;
+        }
+        if (fontSize.includes("vw")) {
+            // 根据视口宽度来转换
+            return parseFloat(fontSize) * window.innerWidth / 100;
+        }
+        if (fontSize.includes("vh")) {
+            // 根据视口高度来转换
+            return parseFloat(fontSize) * window.innerHeight / 100;
+        }
+        return fontSize; // 默认返回 px 单位
     }
 
 })();

@@ -67,11 +67,9 @@
 
 ### Changelog
 
+- **v1.2** : -1. Support font adjustment in iframes to solve the problem that some websites (such as DingTalk Online documents) cannot adjust fonts. -2. Modify the README document; -3. Add language support for script names and descriptions.
+- **v1.1** : -1. Resolved the issue where supported font families could not be applied; -2. Support handling font adjustments in the Shadow DOM to solve the problem that some websites (such as bilibili) are unable to adjust fonts;
 - **v1.0**: Initial version with support for font size adjustment, font type selection, dynamic adjustment, timed adjustment, and memory settings.
-- **v1.1** : 
-    - 1. Resolved the issue where supported font families could not be applied; 
-    - 2. Support handling font adjustments in the Shadow DOM to solve the problem that some websites are unable to adjust fonts; 
-    - 3. Modify the README document.
 
 ### Contact
 
