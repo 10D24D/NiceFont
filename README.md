@@ -1,3 +1,6 @@
+| <a href="https://github.com/10D24D/NiceFont/blob/main/README.md">中文</a> | <a href="https://github.com/10D24D/NiceFont/blob/main/docs/README_EN.md">English</a> | 
+| --- | --- | 
+
 ## NiceFont - 字体调整脚本
 
 ### 说明
