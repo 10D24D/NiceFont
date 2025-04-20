@@ -11,7 +11,7 @@
 // @name:es       NiceFont (Fuente agradable)
 // @name:pt       NiceFont (Fonte agradável)
 // @namespace    https://github.com/10D24D/NiceFont/
-// @version      1.3
+// @version      1.4
 // @description  NiceFont: 修改页面字体的工具，“真正调整字体，而非页面缩放，拒绝将就！”。让字体更清晰、舒适！支持动态、定时调整字体大小和类型，记住你的设置，轻松优化每个网页的字体显示！
 // @description:en NiceFont is a tool for modifying webpage fonts. "Adjust the font itself, not the page zoom. No compromises!" It makes the fonts clearer and more comfortable! Supports dynamic and timed adjustments for font size and type, remembers your settings, and easily optimizes the font display on every webpage!
 // @description:zh-CN NiceFont: 修改页面字体的工具，“真正调整字体，而非页面缩放，拒绝将就！”。让字体更清晰、舒适！支持动态、定时调整字体大小和类型，记住你的设置，轻松优化每个网页的字体显示！
@@ -42,11 +42,20 @@
 
     const STORAGE_KEY = 'NiceFont_config'; // 存储字体大小和字体类型配置的键
 
-    // 读取 localStorage 配置
+    // 读取配置
     let localConfig = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
     let globalConfig = GM_getValue(STORAGE_KEY, {});
 
     let currentLanguage = GM_getValue('language', navigator.language); // 获取用户的语言设置，默认语言为浏览器所设置的语言
+
+    // 检查是否支持当前语言，如果不支持，则使用中文（zh）或英文（en）
+    if (!translations[currentLanguage]) {
+        if (currentLanguage.startsWith('zh')) {
+            currentLanguage = 'zh';  // 如果是汉语相关的，使用 zh
+        } else {
+            currentLanguage = 'en';  // 否则使用英文
+        }
+    }
 
     // 获取字体类型配置
     let fontIncrement = localConfig.increment || globalConfig.increment || 1;
@@ -323,7 +332,7 @@
             saveConfigConfirm: "Selecione como deseja salvar as configurações!\n'OK' aplica apenas ao site atual, 'Cancelar' aplica a todos os sites.",
         },
     };
-    
+
 
     // 更新菜单命令
     updateMenuCommands();

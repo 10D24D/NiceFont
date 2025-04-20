@@ -26,6 +26,7 @@
 
 ### 📜 Changelog
 
+- **v1.4** : Urgent fix for the BUG where the menu does not display.
 - **v1.3**: 1. Code optimization; 2. New configuration saving feature (more detailed font settings, distinguishing current website and all websites); 3. Added first-time font adjustment feature (font will be adjusted automatically 3 seconds after page refresh or first visit); 4. UX optimization (fixed floating menu, font size adjustments are easier); 5. Added support for more languages.
 - **v1.2**: 1. Added support for adjusting fonts within iFrames, solving font adjustment issues on some websites (e.g., DingTalk online documents); 2. Updated README documentation; 3. Added multi-language support.
 - **v1.1**: 1. Fixed issue where supported font families were not being applied; 2. Added support for font adjustments within Shadow DOM, solving font adjustment issues on some websites (e.g., Bilibili comment section); 3. Updated README documentation.
