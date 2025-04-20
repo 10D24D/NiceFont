@@ -1,69 +1,72 @@
+<!-- ## NiceFont - Font Adjustment Script
+
+<center><div align="center">
+
+<br>
+
+<img alt="version" src="https://img.shields.io/greasyfork/v/533232?style=for-the-badge&label=Version&logo=velog&logoColor=BE95FF&color=7B68EE"></img>
+<img alt="download" src="https://img.shields.io/greasyfork/dt/533232?style=for-the-badge&label=Downloads&logo=bilibili&logoColor=78FF96"></img>
+<img alt="stars" src="https://img.shields.io/github/stars/10D24D/NiceFont?style=for-the-badge&label=Stars&logo=undertale&logoColor=red&color=orange"></img>
+<img alt="forks" src="https://img.shields.io/github/forks/10D24D/NiceFont?style=for-the-badge&label=Forks&logo=stackshare&logoColor=green&color=0AC18E"></img>
+
+</div></center>
+
+<br>
+
 | <a href="https://github.com/10D24D/NiceFont/blob/main/README.md">中文</a> | <a href="https://github.com/10D24D/NiceFont/blob/main/docs/README_EN.md">English</a> | 
 | --- | --- | 
 
-## NiceFont - Font Adjustment Script
 
-### ✨ Introduction
+### ✨ Project Introduction
 
-**NiceFont** is a Tampermonkey script designed to make fonts on web pages clearer and more comfortable to read 📝. It supports dynamic, timed, and manual adjustments of font size and type, and remembers these settings, applying them automatically after page refresh 🔄.
+- **NiceFont** is a script tool that adjusts webpage fonts to make them clearer, more comfortable, and aesthetically pleasing! "We adjust the font, not the page zoom—no compromises!"
+- It supports dynamic, timed, and manual font size and type adjustments, and remembers these settings across different pages, so the same font settings will be applied the next time you visit.
+- It works on most websites, including Bilibili's comment section and DingTalk's online documents.
+- If you like this plugin, please give my GitHub project [NiceFont](https://github.com/10D24D/NiceFont) a ⭐️ to support it.
 
-### 🆕 Changelog
+### 📜 Changelog
 
-- **v1.2**: Added support for adjusting fonts in iFrames, solving font adjustment issues on certain websites (e.g., DingTalk online documents) 📑; updated README documentation 📖; added language support 🌍.
-- **v1.1**: Fixed issues where supported font families were not being applied 🛠️; added support for adjusting fonts in Shadow DOMs, solving font adjustment issues on certain websites (e.g., Bilibili) 🎬; updated README documentation 📘.
-- **v1.0**: Initial release 🚀, supporting font size adjustment, font type selection, dynamic adjustments, timed adjustments, and saved settings 💾.
+- **v1.3**: 1. Code optimization; 2. New configuration saving feature (more detailed font settings, distinguishing current website and all websites); 3. Added first-time font adjustment feature (font will be adjusted automatically 3 seconds after page refresh or first visit); 4. UX optimization (fixed floating menu, font size adjustments are easier); 5. Added support for more languages.
+- **v1.2**: 1. Added support for adjusting fonts within iFrames, solving font adjustment issues on some websites (e.g., DingTalk online documents); 2. Updated README documentation; 3. Added multi-language support.
+- **v1.1**: 1. Fixed issue where supported font families were not being applied; 2. Added support for font adjustments within Shadow DOM, solving font adjustment issues on some websites (e.g., Bilibili comment section); 3. Updated README documentation.
+- **v1.0**: Initial version, supports font size adjustment, font type selection, dynamic adjustment, timed adjustment, and saving settings.
 
 ### 🎨 Interface Preview
 
 <img src="/static/ui_en.png" width="350"></img>
 
-### 🔧 Main Features
+### 📑 Key Features
 
-- **Font Adjustment**: Adjust font size and type freely 🖋️.
-- **Dynamic Adjustment**: Automatically adjusts fonts when page content changes 🔄.
-- **Timed Adjustment**: Set an interval to adjust the font periodically ⏲️.
-- **Language Support**: Supports both Simplified Chinese and English 🌏.
-- **Saved Settings**: All font adjustment settings are saved and applied automatically after a page refresh 💾.
+- **📏 Font Size Adjustment**: Displays the current font size adjustments on the page.
+- **🔼 Increase Font Size**: Click the menu to increase the font size of all text on the page.
+- **🔽 Decrease Font Size**: Click the menu to decrease the font size of all text on the page.
+- **🔁 Restore Font**: Restore the initial font settings.
+- **♻️ Apply Font Changes**: Reapply the adjusted font settings.
+- **⚙️ Set Font Increment**: Set the increment for each font adjustment (default is 1px).
+- **🖋️ Set Font Type**: Set the font type used on the webpage.
+- **1️⃣ Toggle First-time Font Adjustment**: Enable or disable the first-time font adjustment feature. When enabled, fonts will be adjusted automatically 3 seconds after first visiting a page or refreshing.
+- **👁️ Toggle Dynamic Font Adjustment**: Enable or disable dynamic font adjustment. When enabled, the font will automatically adjust when new content appears on the page.
+- **⏱️ Toggle Timed Font Adjustment**: Set a time interval for periodic font adjustments. The font will automatically adjust at the specified time intervals.
+- **🌐 Switch Menu Language**: Set the language of the menu. Supports Chinese, English, Korean, Japanese, Russian, French, German, Spanish, and Portuguese.
+- **💾 Save Settings**: Your adjustments will be saved and can be applied across different websites. You can save settings locally or globally, and they will automatically take effect after a page refresh.
 
 ### 🚀 Installation Steps
 
 1. Install [Tampermonkey](https://www.tampermonkey.net/) or [Greasemonkey](https://www.greasespot.net/) 🛠️.
-2. Visit the [NiceFont script page](https://greasyfork.org/en/scripts/533232-nicefont) 🌐.
-3. Click the "Install" button to automatically add the script to your script manager ⚙️.
-4. Refresh the webpage to start using the script 🔄.
-
-### 📝 Usage Guide
-
-- **Adjust Font Size**: Increase, decrease, or reset the font size via the menu 📏.
-- **Select Font Type**: Choose from a variety of font types, including common system fonts 🖋️.
-- **Switch Language**: Toggle between Simplified Chinese and English in the menu 🔄.
-- **Dynamic Adjustment**: Fonts are automatically adjusted when the page content changes, ideal for frequently updated pages 🔄.
-- **Timed Adjustment**: Set an interval to periodically adjust the font ⏲️.
-
-### 📑 Menu Features
-
-- **Increase Font Size**: Click to increase the font size, with customizable increment 🔼.
-- **Decrease Font Size**: Click to decrease the font size, with customizable increment 🔽.
-- **Reset to Default Font**: Restore the original font 🔁.
-- **Reapply Font Changes**: Reapply the font adjustments ♻️.
-- **Set Font Increment**: Set the increment for each font adjustment (default is 1px) ⚙️.
-- **Set Font Type**: Choose and set the font type for the webpage 🖋️.
-- **Toggle Dynamic Adjustment**: Enable or disable dynamic font adjustment 👁️.
-- **Toggle Timed Adjustment**: Set the interval for timed font adjustments ⏱️.
-- **Switch Language**: Toggle between Simplified Chinese and English menu languages 🌍.
-
-### 📚 Contact
-
-- **GitHub**: [https://github.com/10D24D/NiceFont](https://github.com/10D24D/NiceFont) 📍
+2. Go to the [NiceFont Script Page](https://greasyfork.org/en/scripts/533232-nicefont) 🌐.
+3. Click the "Install" button, and the script will be automatically added to your script manager ⚙️.
+4. Refresh the page, and start using the script by clicking the menu 🔄.
 
 ### 🤝 How to Contribute
 
-We welcome code contributions and suggestions! Please submit your feedback via Issues or directly open a Pull Request. If you can, please leave a star ⭐ or a positive review to support this project!
+Contributions are welcome! You can submit your feedback via Issues or directly create a Pull Request. If you can, please consider giving a ⭐️ or leaving a positive review to support this project!
+
+**GitHub**: [https://github.com/10D24D/NiceFont](https://github.com/10D24D/NiceFont) 📍
 
 ### 📝 License
 
-This project is licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). Please comply with the terms of the license when using, modifying, or distributing the code 📜.
+This project is licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). Please follow the terms of the license when using, modifying, and distributing the code.
 
 ### ⚠️ Disclaimer
 
-This script is an open-source project and is free for everyone to use. By using this script, you agree to take responsibility for any risks associated with it. The developers are not responsible for any losses or issues caused by using this script ⚠️.
+This script is an open-source project, free for everyone to use. By using this script, you agree to take responsibility for any risks it may introduce. The developer is not responsible for any losses or issues caused by the use of this script.
