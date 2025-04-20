@@ -1,21 +1,16 @@
 ## NiceFont - 字体调整脚本
 
-<center><div align="center">
-
-<br>
-
-<img alt="version" src="https://img.shields.io/greasyfork/v/533232?style=for-the-badge&label=%E7%89%88%E6%9C%AC&logo=velog&logoColor=BE95FF&color=7B68EE"></img>
-<img alt="download" src="https://img.shields.io/greasyfork/dt/533232?style=for-the-badge&label=%E7%94%A8%E6%88%B7%E5%AE%89%E8%A3%85%E9%87%8F&logo=bilibili&logoColor=78FF96"></img>
-<img alt="stars" src="https://img.shields.io/github/stars/10D24D/NiceFont?style=for-the-badge&label=Stars&logo=undertale&logoColor=red&color=orange"></img>
-<img alt="forks" src="https://img.shields.io/github/forks/10D24D/NiceFont?style=for-the-badge&label=Forks&logo=stackshare&logoColor=green&color=0AC18E"></img>
-
-</div></center>
-
-<br>
-
 | <a href="https://github.com/10D24D/NiceFont/blob/main/README.md">中文</a> | <a href="https://github.com/10D24D/NiceFont/blob/main/docs/README_EN.md">English</a> |
 | ------------------------------------------------------------ | ------------------------------------------------------------ |
 
+<a href="https://greasyfork.org/scripts/533232-nicefont" target="_blank">
+<img alt="version" src="https://img.shields.io/greasyfork/v/533232?style=for-the-badge&label=%E7%89%88%E6%9C%AC&logo=velog&logoColor=BE95FF&color=7B68EE"></img>
+<img alt="download" src="https://img.shields.io/greasyfork/dt/533232?style=for-the-badge&label=%E7%94%A8%E6%88%B7%E5%AE%89%E8%A3%85%E9%87%8F&logo=bilibili&logoColor=78FF96"></img>
+</a>
+<a href="https://github.com/10D24D/NiceFont" target="_blank">
+<img alt="stars" src="https://img.shields.io/github/stars/10D24D/NiceFont?style=for-the-badge&label=Stars&logo=undertale&logoColor=red&color=orange"></img>
+<img alt="forks" src="https://img.shields.io/github/forks/10D24D/NiceFont?style=for-the-badge&label=Forks&logo=stackshare&logoColor=green&color=0AC18E"></img>
+</a>
 
 ### ✨ 项目简介
 
@@ -34,7 +29,7 @@
 
 ### 🎨 界面预览
 
-<img src="/static/ui_zh.png" width="350"></img>
+<img alt="UI" src="https://raw.githubusercontent.com/10D24D/NiceFont/refs/heads/main/static/ui_zh.png"></img>
 
 ### 📑 主要功能
 
