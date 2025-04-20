@@ -42,34 +42,6 @@
 
     const STORAGE_KEY = 'NiceFont_config'; // 存储字体大小和字体类型配置的键
 
-    // 读取配置
-    let localConfig = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-    let globalConfig = GM_getValue(STORAGE_KEY, {});
-
-    let currentLanguage = GM_getValue('language', navigator.language); // 获取用户的语言设置，默认语言为浏览器所设置的语言
-
-    // 检查是否支持当前语言，如果不支持，则使用中文（zh）或英文（en）
-    if (!translations[currentLanguage]) {
-        if (currentLanguage.startsWith('zh')) {
-            currentLanguage = 'zh';  // 如果是汉语相关的，使用 zh
-        } else {
-            currentLanguage = 'en';  // 否则使用英文
-        }
-    }
-
-    // 获取字体类型配置
-    let fontIncrement = localConfig.increment || globalConfig.increment || 1;
-    let currentFontFamily = localConfig.fontFamily || globalConfig.fontFamily || 'none';
-    let currentAdjustment = localConfig.resize || globalConfig.resize || 0;
-    let watchDOMChanges = localConfig.watcher ?? globalConfig.watcher ?? false;
-    let intervalSeconds = localConfig.timer || globalConfig.timer || 0;
-    let firstAdjustment = localConfig.first ?? globalConfig.first ?? false;
-
-    let observer = null;
-    let timer = null;
-
-    let menuHandles = {}; // 用来存储油猴菜单项
-
     const supportFonts = [
         'auto', 'Arial', 'cursive', 'emoji', 'fangsong', 'fantasy', 'math', 'monospace', 'none', 'sans-serif', 'serif',
         'system-ui', 'ui-monospace', 'ui-rounded', 'ui-sans-serif', 'ui-serif', '-webkit-body',
@@ -333,6 +305,33 @@
         },
     };
 
+    // 读取配置
+    let localConfig = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    let globalConfig = GM_getValue(STORAGE_KEY, {});
+
+    let currentLanguage = GM_getValue('language', navigator.language); // 获取用户的语言设置，默认语言为浏览器所设置的语言
+
+    // 检查是否支持当前语言，如果不支持，则使用中文（zh）或英文（en）
+    if (!translations[currentLanguage]) {
+        if (currentLanguage.startsWith('zh')) {
+            currentLanguage = 'zh';  // 如果是汉语相关的，使用 zh
+        } else {
+            currentLanguage = 'en';  // 否则使用英文
+        }
+    }
+
+    // 获取字体类型配置
+    let fontIncrement = localConfig.increment || globalConfig.increment || 1;
+    let currentFontFamily = localConfig.fontFamily || globalConfig.fontFamily || 'none';
+    let currentAdjustment = localConfig.resize || globalConfig.resize || 0;
+    let watchDOMChanges = localConfig.watcher ?? globalConfig.watcher ?? false;
+    let intervalSeconds = localConfig.timer || globalConfig.timer || 0;
+    let firstAdjustment = localConfig.first ?? globalConfig.first ?? false;
+
+    let observer = null;
+    let timer = null;
+
+    let menuHandles = {}; // 用来存储油猴菜单项
 
     // 更新菜单命令
     updateMenuCommands();
