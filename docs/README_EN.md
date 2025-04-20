@@ -1,4 +1,4 @@
-<!-- ## NiceFont - Font Adjustment Script
+## NiceFont - Font Adjustment Script
 
 <center><div align="center">
 
