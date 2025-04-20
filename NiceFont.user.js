@@ -314,9 +314,9 @@
     // 检查是否支持当前语言，如果不支持，则使用中文（zh）或英文（en）
     if (!translations[currentLanguage]) {
         if (currentLanguage.startsWith('zh')) {
-            currentLanguage = 'zh';  // 如果是汉语相关的，使用 zh
+            currentLanguage = 'zh';
         } else {
-            currentLanguage = 'en';  // 否则使用英文
+            currentLanguage = 'en';
         }
     }
 
@@ -531,7 +531,7 @@
         return Array.from(el.childNodes).some(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim() !== "");
     }
 
-    // 批量更新字体大小
+    // 批量更新字体
     function applyFontRecursively(el, increment) {
         if (el.nodeType !== Node.ELEMENT_NODE) return;
 
@@ -553,11 +553,11 @@
                 el.style.fontSize = `${newFontSize}px`;
             }
 
-            // 设置字体类型，只更新需要更新的 fontFamily
+            // 设置字体类型
             if (el.style.fontFamily !== currentFontFamily) {
                 el.style.fontFamily = currentFontFamily;
                 Array.from(el.getElementsByTagName('*')).forEach(child => {
-                    child.style.fontFamily = fontFamily;
+                    child.style.fontFamily = currentFontFamily;
                 });
 
             }
