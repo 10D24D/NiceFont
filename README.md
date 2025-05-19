@@ -1,119 +1,113 @@
-## NiceFont - 字体调整脚本
+# NiceFont - 让网页字体更清晰、更舒适！
 
-| <a href="https://github.com/10D24D/NiceFont/blob/main/README.md">中文</a> | <a href="https://github.com/10D24D/NiceFont/blob/main/docs/README_EN.md">English</a> |
-| ------------------------------------------------------------ | ------------------------------------------------------------ |
+| [中文](https://github.com/10D24D/NiceFont/blob/main/README.md) | [English](https://github.com/10D24D/NiceFont/blob/main/docs/README_EN.md) |
 
-<a href="https://greasyfork.org/scripts/533232-nicefont" target="_blank">
-<img alt="version" src="https://img.shields.io/greasyfork/v/533232?style=for-the-badge&label=%E7%89%88%E6%9C%AC&logo=velog&logoColor=BE95FF&color=7B68EE"></img>
-<img alt="download" src="https://img.shields.io/greasyfork/dt/533232?style=for-the-badge&label=%E7%94%A8%E6%88%B7%E5%AE%89%E8%A3%85%E9%87%8F&logo=bilibili&logoColor=78FF96"></img>
-</a>
-<a href="https://github.com/10D24D/NiceFont" target="_blank">
-<img alt="stars" src="https://img.shields.io/github/stars/10D24D/NiceFont?style=for-the-badge&label=Stars&logo=undertale&logoColor=red&color=orange"></img>
-<img alt="forks" src="https://img.shields.io/github/forks/10D24D/NiceFont?style=for-the-badge&label=Forks&logo=stackshare&logoColor=green&color=0AC18E"></img>
-</a>
+[![Version](https://img.shields.io/greasyfork/v/533232?style=for-the-badge&label=版本&logo=velog&logoColor=BE95FF&color=7B68EE)](https://greasyfork.org/scripts/533232-nicefont) 
+[![Downloads](https://img.shields.io/greasyfork/dt/533232?style=for-the-badge&label=用户安装量&logo=bilibili&logoColor=78FF96)](https://greasyfork.org/scripts/533232-nicefont)  
+[![Stars](https://img.shields.io/github/stars/10D24D/NiceFont?style=for-the-badge&label=Stars&logo=undertale&logoColor=red&color=orange)](https://github.com/10D24D/NiceFont) 
+[![Forks](https://img.shields.io/github/forks/10D24D/NiceFont?style=for-the-badge&label=Forks&logo=stackshare&logoColor=green&color=0AC18E)](https://github.com/10D24D/NiceFont)
 
-### ✨ 项目简介
+## ✨ 项目简介
 
-- **NiceFont** 是一款修改页面字体的脚本工具，旨在让字体更加清晰、舒适、耐视、好看！“真正调整字体，而非页面缩放，拒绝将就！”。
-- 支持动态、定时和手动调整字体大小和类型，可记住在不同页面上的字体设置，下次仍然使用同样的字体访问。
-- 基本支持所有网站的字体调整，包括B站的评论区、钉钉的在线文档。
-- 喜欢这个插件的小伙伴，可以给我的GitHub项目 [NiceFont](https://github.com/10D24D/NiceFont) 点个⭐️STAR支持一下。
+**NiceFont** 是一款强大的用户脚本工具，专为优化网页字体设计，让你的浏览体验更清晰、更舒适！  
+厌倦了网页字体太小、模糊或不统一？NiceFont 让你轻松掌控字体大小和风格，“真正调整字体，而非页面缩放，拒绝将就”！
 
-### 📜 更新日志
+- **跨网站支持**：适用于几乎所有网站，包括 B 站评论区、钉钉在线文档等。
+- **个性化体验**：支持动态调整、定时调整和手动调整字体，设置自动保存，刷新后依然生效。
+- **多语言界面**：支持 9 种语言（汉语、英语、韩语、日语、俄语、法语、德语、西班牙语、葡萄牙语），全球用户轻松使用。
+- **简单易用**：拖拽式浮动面板或 Tampermonkey 菜单，操作直观便捷。
 
-#### v2.0.0 - 2025-05-19
+喜欢 NiceFont？请给我们的 [GitHub 项目](https://github.com/10D24D/NiceFont) 点个 ⭐ Star 支持吧！
 
-**新功能**
+## 🎨 界面预览
 
-- **切换菜单面板**：新增直观的浮动面板界面，支持下拉菜单选择字体、实时状态显示和一键保存配置。用户可在浮动面板和 Tampermonkey 菜单间切换。
-- **首次调整字体**：支持自定义首次加载页面后调整字体的时间，提升初始体验。
-- **当前配置源于**：直观显示当前网站的字体配置情况。
-- **配置作用范围**：支持子域名、顶级域名、所有网站三种配置模式，灵活保存和应用字体设置。
+| ![UI 1](https://raw.githubusercontent.com/10D24D/NiceFont/refs/heads/main/static/ui_1_zh.png) | ![UI 2](https://raw.githubusercontent.com/10D24D/NiceFont/refs/heads/main/static/ui_2_zh.png) |
+| :-----------------------------------------------------------------------------------------: | :-----------------------------------------------------------------------------------------: |
 
-**改进**
+## 📑 主要功能
 
-- **性能优化**：
-  - 使用节流（`throttle`）优化动态调整，降低性能开销。
-- **健壮性**：
-  - 新增日志功能（`log`）便于调试。
-  - 增加错误捕获（`try-catch`），提高脚本稳定性。
+- **📏 实时字体调整**：一键放大/缩小字体，精确控制大小（默认增量 1px）。
+- **🔠 自定义字体类型**：选择内置字体（如仿宋、微软雅黑）或输入自定义字体。
+- **🔄 恢复字体**：一键重置字体，恢复网页原始设置。
+- **1️⃣ 首次调整**：页面加载后自动调整字体，支持自定义延迟时间（默认 3 秒）。
+- **🔎 动态调整**：页面内容变化时自动应用字体设置，保持一致体验。
+- **⏱️ 定时调整**：按设定的时间间隔定期更新字体，适合动态网页。
+- **🌐 多语言支持**：菜单支持 9 种语言，随时切换。
+- **🎨 灵活面板**：选择“网页菜单”浮动面板 或 Tampermonkey自带的“油猴菜单”。
+- **📍 配置范围**：支持子域名、顶级域名或全局配置，灵活保存你的偏好。
+- **💾 持久保存**：字体设置自动保存，跨页面或设备保持一致。
 
-**修复**
-
-- 修复了旧版中字体重置问题。
-
----
-
-#### v1.4 - 2025-04-20
-
-- 紧急修复菜单不显示的 BUG。
-
----
-
-#### v1.3 - 2025-04-20
-
-- 优化代码，新增配置保存功能，首次访问页面自动调整字体。
-- 体验优化：固定悬浮菜单，调整字体大小更省心。
-
----
-
-#### v1.2 - 2025-04-19
-
-- 支持 iframe 内字体调整，解决钉钉在线文档字体无法调整的问题。
-
----
-
-#### v1.1 - 2025-04-19
-
-- 增加对 Shadow DOM 的支持，解决 B 站评论区字体无法调整的问题。
-
----
-
-#### v1.0 - 2025-04-18
-
-- 初始版本，支持字体大小调整、字体类型选择、动态调整、定时调整和记忆设置功能。
-
-### 🎨 界面预览
-
-<img alt="UI" src="https://raw.githubusercontent.com/10D24D/NiceFont/refs/heads/main/static/ui_1_zh.png"></img>
-
-<img alt="UI" src="https://raw.githubusercontent.com/10D24D/NiceFont/refs/heads/main/static/ui_2_zh.png"></img>
-
-### 📑 主要功能
-
-- **📏 字体大小调整**：显示当前网页调整字体大小的情况。
-- **🔼 放大字体**：一键放大网页所有字体。
-- **🔽 缩小字体**：一键缩小网页所有字体。
-- **🔁 恢复字体**：恢复网页初始字体设置。
-- **♻️ 应用字体变化**：重新应用已设置的字体调整。
-- **📈 设置字体增量**：自定义每次调整的字体大小增量（默认 1px）。
-- **🖋️ 设置字体类型**：选择或输入自定义字体类型（如 仿宋、微软雅黑）。
-- **1️⃣ 切换首次调整字体**：开启后，页面加载 3 秒后自动调整字体，可自定义时间。
-- **👁️ 切换动态调整字体**：开启后，页面新内容加载时自动调整字体。
-- **⏱️ 切换定时调整字体**：设置定时间隔，定期应用字体调整。
-- **🌐 切换菜单语言**：自由切换菜单显示语言。支持 9 种语言：支持汉语、英语、韩语、日语、俄语、法语、德语、西班牙语、葡萄牙语。
-- **🎨 切换菜单面板:** 在浮动面板和 Tampermonkey 菜单间切换。
-- **📍 当前配置源于:** 显示当前网站使用的字体配置来源。点击菜单可删除当前配置
-- **ℹ️ 配置作用范围:** 选择配置保存范围（子域名、顶级域名、所有网站）。
-- **💾 保存设置**：支持局部或全局保存设置，刷新后自动生效。
-
-### 🚀 安装步骤
+## 🚀 安装步骤
 
 1. 安装 [Tampermonkey](https://www.tampermonkey.net/) 或 [Greasemonkey](https://www.greasespot.net/) 🛠️。
 2. 访问 [NiceFont 脚本页面](https://greasyfork.org/zh-CN/scripts/533232-nicefont) 🌐。
-3. 点击“安装”按钮，脚本将自动添加到您的油猴管理器中 ⚙️。
-4. 刷新网页，点击脚本菜单即可开始使用脚本 🔄。
+3. 点击“安装”按钮，脚本将自动添加到你的脚本管理器 ⚙️。
+4. 刷新任意网页，打开 NiceFont 菜单，开始自定义字体！🔄
 
-### 🤝 如何贡献
+## 📜 更新日志
 
-欢迎贡献代码和改进意见！请通过 Issue 提交您的反馈，或者直接发起 Pull Request。如果可以，帮忙点个 Star ⭐ 或好评支持这个项目！
+### v3.0 - 2025-05-20
+- **新功能**：
+  - 新增拖拽式浮动面板。
+  - 小小的智能，在没有保存字体配置的网站中自动弹出面板。
+- **改进**：
+  - 使用模块化重新编码。
+- **修复**：
+  - 修复字体重置和 iframe 兼容性问题。
 
-**GitHub**：[https://github.com/10D24D/NiceFont](https://github.com/10D24D/NiceFont) 📍
+### v2.0 - 2025-05-19
+- **新功能**
+  - 新增“切换菜单面板”功能，直观的浮动面板界面，支持下拉菜单选择字体、实时状态显示和一键保存配置。
+  - 新增“当前配置源于”功能，直观显示当前网站的字体配置情况。
+  - 新增“配置作用范围”功能，支持子域名、顶级域名、所有网站三种配置模式，灵活保存和应用字体设置。
+- **改进**
+  - 使用节流（`throttle`）优化动态调整，降低性能开销。
+  - 新增日志功能（`log`）便于调试。
+  - 增加错误捕获（`try-catch`），提高脚本稳定性。
+  - 首次调整字体功能，支持自定义延迟时间，用以页面加载后自动调整字体，提升体验。
+- **修复**
+  - 修复了旧版中字体重置问题。
 
-### 📝 许可协议
+### v1.4 - 2025-04-20
+- 修复菜单不显示的紧急 Bug。
 
-此项目遵循 [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0) 开源协议。使用、修改及分发代码时，请遵守该协议条款。
+### v1.3 - 2025-04-20
+- 新增配置保存功能，首次访问页面自动调整字体。
+- 优化悬浮菜单体验，调整字体更流畅。
 
-### ⚠️ 免责声明
+### v1.2 - 2025-04-19
+- 支持 iframe 字体调整，兼容钉钉在线文档。
 
-此脚本为开源项目，免费供所有人使用。使用本脚本时，您同意承担由于脚本带来的任何风险。开发者不对由于使用本脚本导致的任何损失或问题负责。
+### v1.1 - 2025-04-19
+- 支持 Shadow DOM，修复 B 站评论区字体调整问题。
+
+### v1.0 - 2025-04-18
+- 初始版本，支持字体大小调整、类型选择、动态/定时调整及设置保存。
+
+## ❓ 常见问题 (FAQ)
+
+- **NiceFont 支持哪些网站？**  
+  NiceFont 兼容几乎所有网站，包括 B 站、钉钉、知乎等，支持 iframe 和 Shadow DOM 内容。
+- **如何自定义字体？**  
+  在菜单中选择“设置字体类型”，可从内置字体（如 Arial、仿宋）中选择，或输入自定义字体名称。
+- **为什么我的设置没有保存？**  
+  请确保点击“保存设置”并选择配置范围（子域名/顶级域名/全局）。设置会自动应用到后续访问。
+- **如何切换语言？**  
+  在菜单中选择“切换菜单语言”，支持 9 种语言切换。
+- **遇到问题怎么办？**  
+  请在 [GitHub Issues](https://github.com/10D24D/NiceFont/issues) 提交反馈，我们会尽快解决！
+
+## 🤝 如何贡献
+
+欢迎为 NiceFont 贡献代码或建议！  
+- 提交 Bug 或功能请求：[GitHub Issues](https://github.com/10D24D/NiceFont/issues) 📝  
+- 贡献代码：Fork 项目并提交 Pull Request 🚀  
+- 喜欢 NiceFont？点个 [⭐ Star](https://github.com/10D24D/NiceFont) 或在 [GreasyFork](https://greasyfork.org/zh-CN/scripts/533232-nicefont) 留下好评！
+
+## 📝 许可协议
+
+NiceFont 遵循 [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0) 开源协议。欢迎使用、修改和分享，但请遵守协议条款。
+
+## ⚠️ 免责声明
+
+NiceFont 是一个免费的开源项目。使用本脚本即表示你同意承担相关风险。开发者不对因使用脚本导致的任何问题或损失负责。

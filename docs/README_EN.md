@@ -1,119 +1,115 @@
-## NiceFont - Font Adjustment Script
+# NiceFont - Make Web Fonts Clearer and More Comfortable!
 
-| <a href="https://github.com/10D24D/NiceFont/blob/main/README.md">中文</a> | <a href="https://github.com/10D24D/NiceFont/blob/main/docs/README_EN.md">English</a> |
-| ------------------------------------------------------------ | ------------------------------------------------------------ |
+| [中文](https://github.com/10D24D/NiceFont/blob/main/README.md) | [English](https://github.com/10D24D/NiceFont/blob/main/docs/README_EN.md) |
 
-<a href="https://greasyfork.org/scripts/533232-nicefont" target="_blank">
-<img alt="version" src="https://img.shields.io/greasyfork/v/533232?style=for-the-badge&label=Version&logo=velog&logoColor=BE95FF&color=7B68EE"></img>
-<img alt="download" src="https://img.shields.io/greasyfork/dt/533232?style=for-the-badge&label=Installs&logo=bilibili&logoColor=78FF96"></img>
-</a>
-<a href="https://github.com/10D24D/NiceFont" target="_blank">
-<img alt="stars" src="https://img.shields.io/github/stars/10D24D/NiceFont?style=for-the-badge&label=Stars&logo=undertale&logoColor=red&color=orange"></img>
-<img alt="forks" src="https://img.shields.io/github/forks/10D24D/NiceFont?style=for-the-badge&label=Forks&logo=stackshare&logoColor=green&color=0AC18E"></img>
-</a>
+[![Version](https://img.shields.io/greasyfork/v/533232?style=for-the-badge&label=Version&logo=velog&logoColor=BE95FF&color=7B68EE)](https://greasyfork.org/scripts/533232-nicefont) 
+[![Downloads](https://img.shields.io/greasyfork/dt/533232?style=for-the-badge&label=Installs&logo=bilibili&logoColor=78FF96)](https://greasyfork.org/scripts/533232-nicefont)  
+[![Stars](https://img.shields.io/github/stars/10D24D/NiceFont?style=for-the-badge&label=Stars&logo=undertale&logoColor=red&color=orange)](https://github.com/10D24D/NiceFont) 
+[![Forks](https://img.shields.io/github/forks/10D24D/NiceFont?style=for-the-badge&label=Forks&logo=stackshare&logoColor=green&color=0AC18E)](https://github.com/10D24D/NiceFont)
 
-### ✨ Project Overview
+## ✨ Overview
 
-- **NiceFont** is a font modification userscript designed to make fonts clearer, more comfortable, eye-friendly, and aesthetically pleasing! “Truly adjust the font, not the page zoom. Refuse to settle!”
-- Supports dynamic, scheduled, and manual font adjustment. Remembers your font settings for each page and applies them the next time you visit.
-- Works on almost all websites, including comment sections on Bilibili and online docs on DingTalk.
-- If you like this script, feel free to star the GitHub repo [NiceFont](https://github.com/10D24D/NiceFont) ⭐.
+**NiceFont** is a powerful userscript tool designed to optimize web fonts, making your browsing experience clearer and more comfortable!  
+Tired of small, blurry, or inconsistent web fonts? NiceFont gives you full control over font size and style — truly adjust fonts, not just zoom the page!
 
-### 📜 Changelog
+- **Cross-site support**: Works on almost any website, including Bilibili comments and DingTalk documents.
+- **Personalized experience**: Supports dynamic, scheduled, and manual font adjustments. Settings are saved automatically and persist after refresh.
+- **Multilingual UI**: Supports 9 languages (Chinese, English, Korean, Japanese, Russian, French, German, Spanish, Portuguese) for global usability.
+- **User-friendly**: Intuitive floating panel and Tampermonkey menu make it easy to use.
 
-#### v2.0.0 - 2025-05-19
+Like NiceFont? ⭐ Star us on [GitHub](https://github.com/10D24D/NiceFont)!
 
-**New Features**
+## 🎨 UI Preview
 
-- **Switchable Menu Panel**: A new floating panel interface allows for intuitive font selection via dropdowns, real-time status display, and one-click save. You can switch between the floating panel and Tampermonkey menu.
-- **Initial Font Adjustment**: Customize the delay before the first font adjustment after the page loads for better UX.
-- **Current Config Source**: Clearly indicates the origin of the current font settings for the site.
-- **Config Scope**: Choose to save/apply settings for subdomain, root domain, or all sites.
+| ![UI 1](https://raw.githubusercontent.com/10D24D/NiceFont/refs/heads/main/static/ui_1_en.png) | ![UI 2](https://raw.githubusercontent.com/10D24D/NiceFont/refs/heads/main/static/ui_2_en.png) |
+| :-----------------------------------------------------------------------------------------: | :-----------------------------------------------------------------------------------------: |
 
-**Improvements**
+## 📑 Key Features
 
-- **Performance Optimization**:
-  - Added `throttle` for dynamic adjustment to reduce performance impact.
-- **Robustness**:
-  - Added `log` function for debugging.
-  - Added `try-catch` for better error handling and script stability.
+- **📏 Real-time font adjustment**: One-click increase/decrease with precision (1px by default).
+- **🔠 Custom fonts**: Choose from built-in fonts (e.g., FangSong, Microsoft YaHei) or enter custom font names.
+- **🔄 Reset fonts**: One-click to restore original web fonts.
+- **1️⃣ Initial adjustment**: Auto adjust fonts after page load with custom delay (default 3s).
+- **🔎 Dynamic adjustment**: Automatically applies font settings as content changes.
+- **⏱️ Scheduled adjustment**: Periodically reapply font settings — great for dynamic content.
+- **🌐 Multilingual support**: Switch UI language anytime.
+- **🎨 Flexible panels**: Choose between a floating panel or the Tampermonkey menu.
+- **📍 Config scope**: Apply settings by subdomain, root domain, or globally.
+- **💾 Persistent storage**: Settings are saved and synced across pages or devices.
 
-**Fixes**
+## 🚀 Installation
 
-- Fixed font reset issues in earlier versions.
+1. Install [Tampermonkey](https://www.tampermonkey.net/) or [Greasemonkey](https://www.greasespot.net/). 🛠️  
+2. Visit the [NiceFont script page](https://greasyfork.org/en/scripts/533232-nicefont). 🌐  
+3. Click the "Install" button to add the script to your manager. ⚙️  
+4. Refresh any webpage and open the NiceFont menu to start customizing fonts! 🔄  
 
----
+## 📜 Changelog
 
-#### v1.4 - 2025-04-20
+### v3.0 - 2025-05-20
+- **New**:
+  - Added draggable floating panel.
+  - Automatically shows panel on new sites without saved settings.
+- **Improved**:
+  - Refactored with modular code structure.
+- **Fixed**:
+  - Font reset issues and iframe compatibility bugs.
 
-- Emergency fix for the menu not displaying.
+### v2.0 - 2025-05-19
+- **New**:
+  - Introduced menu switcher with floating UI, dropdown font selector, live status, and one-click save.
+  - Added “Config source” display to show where current settings come from.
+  - Added “Config scope” (subdomain/root domain/global) to flexibly apply settings.
+- **Improved**:
+  - Used `throttle` to optimize performance during dynamic updates.
+  - Added `log` system for debugging.
+  - Wrapped logic in `try-catch` blocks to enhance stability.
+  - Added initial font adjustment with customizable delay after page load.
+- **Fixed**:
+  - Font reset issue from earlier versions.
 
----
+### v1.4 - 2025-04-20
+- Fixed urgent bug where menu wouldn't display.
 
-#### v1.3 - 2025-04-20
+### v1.3 - 2025-04-20
+- Added settings persistence; fonts now auto-adjust on first visit.
+- Improved floating menu experience.
 
-- Refactored code. Added config saving; fonts auto-adjust on first visit.
-- UX improvements: floating menu fixed for easier access.
+### v1.2 - 2025-04-19
+- Support for iframe font adjustment, compatible with DingTalk documents.
 
----
+### v1.1 - 2025-04-19
+- Shadow DOM support; fixed Bilibili comment font issue.
 
-#### v1.2 - 2025-04-19
+### v1.0 - 2025-04-18
+- Initial release: font size adjustment, type selection, dynamic/scheduled adjustment, and saved settings.
 
-- Font adjustment now works in iframes, solving the issue with DingTalk online documents.
+## ❓ FAQ
 
----
+- **Which websites are supported?**  
+  Almost all sites — including Bilibili, DingTalk, Zhihu — with support for iframe and Shadow DOM.
+- **How do I set a custom font?**  
+  In the menu, choose "Set Font Type", then pick a built-in font (e.g. Arial, FangSong) or enter a custom name.
+- **Why aren’t my settings saved?**  
+  Make sure you click "Save Settings" and select a config scope (subdomain/root/global). Settings will auto-apply next time.
+- **How do I switch the language?**  
+  Use the “Switch Language” option in the menu.
+- **Having issues?**  
+  Please report via [GitHub Issues](https://github.com/10D24D/NiceFont/issues) and we’ll help promptly!
 
-#### v1.1 - 2025-04-19
+## 🤝 Contribute
 
-- Added support for Shadow DOM, solving the issue with Bilibili comment font.
+We welcome contributions to NiceFont!  
+- Submit bugs or feature requests: [GitHub Issues](https://github.com/10D24D/NiceFont/issues) 📝  
+- Code contributions: Fork the project and create a Pull Request 🚀  
+- Like NiceFont? Give it a [⭐ Star](https://github.com/10D24D/NiceFont) or leave a review on [GreasyFork](https://greasyfork.org/en/scripts/533232-nicefont)!
 
----
+## 📝 License
 
-#### v1.0 - 2025-04-18
+NiceFont is released under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).  
+Feel free to use, modify, and share it — just follow the terms.
 
-- Initial release with support for font size/type adjustment, dynamic/scheduled updates, and memory features.
+## ⚠️ Disclaimer
 
-### 🎨 UI Preview
-
-<img alt="UI" src="https://raw.githubusercontent.com/10D24D/NiceFont/refs/heads/main/static/ui_1_en.png"></img>
-
-<img alt="UI" src="https://raw.githubusercontent.com/10D24D/NiceFont/refs/heads/main/static/ui_2_en.png"></img>
-
-### 📑 Main Features
-
-- **📏 Font Size Adjustment**: Shows current font size changes on the page.
-- **🔼 Enlarge Fonts**: One-click to enlarge all fonts on the page.
-- **🔽 Shrink Fonts**: One-click to shrink all fonts on the page.
-- **🔁 Reset Fonts**: Restore original fonts on the page.
-- **♻️ Apply Font Changes**: Reapply the current font settings.
-- **📈 Set Font Step**: Customize font size change per step (default 1px).
-- **🖋️ Set Font Family**: Choose or enter custom font family (e.g., Fangsong, Microsoft YaHei).
-- **1️⃣ Toggle Initial Adjustment**: Auto-adjust fonts after 3 seconds (default); customizable delay.
-- **👁️ Toggle Dynamic Adjustment**: Automatically adjust fonts when new content loads.
-- **⏱️ Toggle Scheduled Adjustment**: Apply font changes periodically at set intervals.
-- **🌐 Toggle Menu Language**: Switch UI language freely. Supports 9 languages: Chinese, English, Korean, Japanese, Russian, French, German, Spanish, Portuguese.
-- **🎨 Toggle Menu Panel**: Switch between floating panel and Tampermonkey menu.
-- **📍 Current Config Source**: Shows the source of the current font settings. Click to delete.
-- **ℹ️ Config Scope**: Choose the scope for config saving (subdomain, domain, all sites).
-- **💾 Save Settings**: Save current settings locally or globally. Automatically applies after reload.
-
-### 🚀 Installation Guide
-
-1. Install [Tampermonkey](https://www.tampermonkey.net/) or [Greasemonkey](https://www.greasespot.net/) 🛠️.
-2. Visit the [NiceFont script page](https://greasyfork.org/en/scripts/533232-nicefont) 🌐.
-3. Click the “Install” button to add it to your userscript manager ⚙️.
-4. Refresh any page and access the script menu to start using it 🔄.
-
-### 🤝 How to Contribute
-
-Contributions are welcome! Submit issues, feedback, or Pull Requests on GitHub. And if you find it useful, please leave a ⭐ or a good review to support the project!
-
-**GitHub**: [https://github.com/10D24D/NiceFont](https://github.com/10D24D/NiceFont) 📍
-
-### 📝 License
-
-This project is licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). Please follow the license terms for usage, modification, and distribution.
-
-### ⚠️ Disclaimer
-
-This is an open-source script, free for public use. By using it, you agree to bear any risks. The developer is not liable for any loss or issues arising from the use of this script.
+NiceFont is a free and open-source project.  
+By using this script, you agree to bear all risks. The developers are not liable for any issues or losses caused by the script.

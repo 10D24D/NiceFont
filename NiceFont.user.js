@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         NiceFont
+// @name         NiceFont (耐视字体)
 // @name:zh-CN    NiceFont (耐视字体)
 // @name:zh-TW    NiceFont（耐視字體）
 // @name:en       NiceFont
@@ -10,10 +10,11 @@
 // @name:de       NiceFont (Schöne Schrift)
 // @name:es       NiceFont (Fuente agradable)
 // @name:pt       NiceFont (Fonte agradável)
+// @homepageURL   https://github.com/10D24D/NiceFont/
 // @namespace    https://github.com/10D24D/NiceFont/
-// @version      2.0
+// @version      3.0
 // @description  NiceFont: 修改页面字体的工具，“真正调整字体，而非页面缩放，拒绝将就！”。让字体更清晰、舒适！支持动态、定时调整字体大小和类型，记住你的设置，轻松优化每个网页的字体显示！
-// @description:en NiceFont is a tool for modifying webpage fonts. "Adjust the font itself, not the page zoom. No compromises!" It makes the fonts clearer and more comfortable! Supports dynamic and timed adjustments for font size and type, remembers your settings, and easily optimizes the font display on every webpage!
+// @description:en NiceFont is a tool for modifying webpage fonts. "Adjust the font itself, not the page zoom. No compromises!" It makes fonts clearer and more comfortable! Supports dynamic and timed adjustments for font size and type, remembers your settings, and optimizes font display on every webpage!
 // @description:zh-CN NiceFont: 修改页面字体的工具，“真正调整字体，而非页面缩放，拒绝将就！”。让字体更清晰、舒适！支持动态、定时调整字体大小和类型，记住你的设置，轻松优化每个网页的字体显示！
 // @description:zh-TW NiceFont: 修改頁面字體的工具，“真正調整字體，而非頁面縮放，拒絕將就！”。讓字體更清晰、舒適！支持動態、定時調整字體大小和類型，記住你的設置，輕鬆優化每個網頁的字體顯示！
 // @description:ko NiceFont: 페이지 글꼴을 수정하는 도구, "글꼴을 실제로 조정하고 페이지 확대/축소를 하지 않습니다. 타협하지 마세요!" 글꼴을 더 선명하고 편안하게 만듭니다! 동적 및 시간 기반 글꼴 크기와 유형 조정 지원, 설정을 기억하고 모든 웹페이지의 글꼴 표시를 쉽게 최적화합니다!
@@ -33,77 +34,1125 @@
 // @grant        GM_setValue
 // @grant        GM_addStyle
 // @grant        GM_info
-// @downloadURL https://update.greasyfork.org/scripts/533232/NiceFont.user.js
-// @updateURL   https://update.greasyfork.org/scripts/533232/NiceFont.meta.js
+// @run-at       document-start
+// @downloadURL  https://update.greasyfork.org/scripts/533232/NiceFont.user.js
+// @updateURL    https://update.greasyfork.org/scripts/533232/NiceFont.meta.js
 // ==/UserScript==
 
 (function () {
     'use strict';
 
-    // 日志开关（内部变量，固定为false）
-    const enableLogging = false;
+    // 调试开关，生产环境中禁用日志
+    const enableLogging = true;
 
-    // 自定义日志函数
+    // 关闭跟踪常量
+    const CLOSE_TRACKING_WINDOW = 1800 * 1000; // 30 分钟（毫秒）
+    const CLOSE_COUNT_THRESHOLD = 2; // 连续关闭两次
+
+    /**
+     * 自定义日志函数，仅在调试模式下输出
+     * @param {...any} args - 日志参数
+     */
     function log(...args) {
         if (enableLogging) {
-            console.log(...args);
+            console.log('[NiceFont]', ...args);
         }
     }
 
+    // 跳过 iframe 执行
     if (window.top !== window.self) {
-        log('NiceFont: 跳过iframe中的执行');
-        return; // 不在顶层页面时直接退出脚本
+        log('跳过 iframe 执行');
+        return;
     }
 
-    log('NiceFont: 脚本正在初始化...');
+    // --- 工具函数模块 ---
+    const Utils = {
+        /**
+         * 节流函数，限制函数调用频率
+         * @param {Function} fn - 要节流的函数
+         * @param {number} wait - 节流间隔（毫秒）
+         * @returns {Function} 节流后的函数
+         */
+        throttle(fn, wait) {
+            let lastCall = 0;
+            return function (...args) {
+                const now = Date.now();
+                if (now - lastCall >= wait) {
+                    lastCall = now;
+                    fn(...args);
+                }
+            };
+        },
 
-    // 获取顶级域名（例如 .douban.com）
-    function getTopLevelDomain() {
-        const hostname = window.location.hostname;
-        const parts = hostname.split('.');
-        if (parts.length >= 2) {
-            return `.${parts.slice(-2).join('.')}`;
+        /**
+         * 将字体大小单位转换为像素
+         * @param {HTMLElement} el - 元素
+         * @param {string} fontSize - 字体大小（带单位）
+         * @returns {number} 像素值
+         */
+        convertToPx(el, fontSize) {
+            if (!fontSize) return 16;
+            if (fontSize.includes('rem')) {
+                const rootFontSize = parseFloat(window.getComputedStyle(document.documentElement).fontSize);
+                return parseFloat(fontSize) * rootFontSize;
+            }
+            if (fontSize.includes('em')) {
+                const parentFontSize = parseFloat(window.getComputedStyle(el.parentElement).fontSize);
+                return parseFloat(fontSize) * parentFontSize;
+            }
+            if (fontSize.includes('%')) {
+                const parentFontSize = parseFloat(window.getComputedStyle(el.parentElement).fontSize);
+                return (parseFloat(fontSize) / 100) * parentFontSize;
+            }
+            if (fontSize.includes('pt')) {
+                return parseFloat(fontSize) * 1.3333;
+            }
+            if (fontSize.includes('vw')) {
+                return parseFloat(fontSize) * window.innerWidth / 100;
+            }
+            if (fontSize.includes('vh')) {
+                return parseFloat(fontSize) * window.innerHeight / 100;
+            }
+            return parseFloat(fontSize);
+        },
+
+        /**
+         * 检查元素是否包含可见文本
+         * @param {HTMLElement} el - 元素
+         * @returns {boolean} 是否包含可见文本
+         */
+        hasVisibleText(el) {
+            return Array.from(el.childNodes).some(
+                node => node.nodeType === Node.TEXT_NODE && node.textContent.trim() !== ''
+            );
+        },
+
+        /**
+         * 获取顶级域名
+         * @returns {string} 顶级域名（如 .example.com）
+         */
+        getTopLevelDomain() {
+            const hostname = window.location.hostname;
+            const parts = hostname.split('.');
+            return parts.length >= 2 ? `.${parts.slice(-2).join('.')}` : hostname;
         }
-        return hostname;
-    }
-
-    const BASE_STORAGE_KEY = 'NiceFont_config'; // 基础存储键
-    const GLOBAL_DEFAULT_KEY = 'NiceFont_global_default_config'; // 全局默认配置键
-    const topLevelDomain = getTopLevelDomain();
-    const hostname = window.location.hostname;
-    const SUBDOMAIN_STORAGE_KEY = `${BASE_STORAGE_KEY}_${hostname}`; // 子域名存储键
-    const TOPLEVEL_STORAGE_KEY = `${BASE_STORAGE_KEY}_${topLevelDomain}`; // 顶级域名存储键
-    const PANEL_TYPE_KEY = 'NiceFont_panelType'; // 面板类型键
-
-    // 配置作用范围（1: 子域名, 2: 顶级域名, 3: 所有网站）
-    let configScope = 1; // 默认子域名
-    let targetScope = 1; // 当前会话的目标作用范围，默认子域名
-    const scopeMap = {
-        1: 'subdomain',
-        2: 'topLevelDomain',
-        3: 'allWebsites'
     };
 
-    let supportFonts = [
-        'auto', 'Arial', 'cursive', 'emoji', 'fangsong', 'fantasy', 'math', 'monospace', 'none', 'sans-serif', 'serif',
-        'system-ui', 'ui-monospace', 'ui-rounded', 'ui-sans-serif', 'ui-serif', '-webkit-body',
-        'inherit', 'initial', 'revert', 'revert-layer', 'unset',
-        'Verdana', 'Helvetica', 'Tahoma', 'Times New Roman', 'Georgia', 'Courier New', 'Comic Sans MS',
-        'custom' // 手动输入选项
-    ];
+    // --- 状态管理 ---
+    const State = {
+        fontIncrement: 1,
+        currentFontFamily: 'none',
+        currentAdjustment: 0,
+        watchDOMChanges: false,
+        intervalSeconds: 0,
+        firstAdjustment: false,
+        firstAdjustmentTime: 3,
+        currentLanguage: 'en',
+        panelType: 'floating',
+        isConfigModified: false,
+        targetScope: 1,
+        pendingScopeChange: null,
+        observer: null,
+        timer: null,
 
-    // 多语言文本。支持汉语(zh)、英语(en)、韩语(ko)、日语(ja)、俄语(ru)、法语(fr)、德语(de)、西班牙语(es)、葡萄牙语(pt)
+        /**
+         * 获取状态值
+         * @param {string} key - 状态键
+         * @returns {any} 状态值
+         */
+        get(key) {
+            return this[key];
+        },
+
+        /**
+         * 设置状态值
+         * @param {string} key - 状态键
+         * @param {any} value - 状态值
+         */
+        set(key, value) {
+            this[key] = value;
+        }
+    };
+
+    // --- 配置范围管理 ---
+    const ConfigScopeManager = {
+        BASE_STORAGE_KEY: 'NiceFont_config',
+        GLOBAL_DEFAULT_KEY: 'NiceFont_global_default_config',
+        PANEL_TYPE_KEY: 'NiceFont_panelType',
+        scopeMap: { 1: 'subdomain', 2: 'topLevelDomain', 3: 'allWebsites' },
+
+        /**
+         * 初始化动态键
+         */
+        initKeys() {
+            this.subdomainKey = `${this.BASE_STORAGE_KEY}_${window.location.hostname}`;
+            this.topLevelKey = `${this.BASE_STORAGE_KEY}_${Utils.getTopLevelDomain()}`;
+        },
+
+        /**
+         * 获取当前配置键
+         * @returns {string} 配置键
+         */
+        getConfigKey() {
+            this.initKeys();
+            const scope = State.get('targetScope');
+            if (scope === 1) return this.subdomainKey;
+            if (scope === 2) return this.topLevelKey;
+            return this.GLOBAL_DEFAULT_KEY;
+        },
+
+        /**
+         * 获取当前生效的配置范围
+         * @returns {number} 范围（1: 子域名, 2: 顶级域名, 3: 所有网站）
+         */
+        getEffectiveScope() {
+            this.initKeys();
+            const subdomainConfig = GM_getValue(this.subdomainKey, {});
+            const topLevelConfig = GM_getValue(this.topLevelKey, {});
+            const globalConfig = GM_getValue(this.GLOBAL_DEFAULT_KEY, {});
+            if (Object.keys(subdomainConfig).length > 0) return 1;
+            if (Object.keys(topLevelConfig).length > 0) return 2;
+            if (Object.keys(globalConfig).length > 0) return 3;
+            return 1; // 默认返回子域名
+        },
+
+        /**
+         * 检查当前网站是否已有配置
+         * @returns {boolean} 是否存在配置
+         */
+        hasConfig() {
+            this.initKeys();
+            const configKey = this.getConfigKey();
+            const config = GM_getValue(configKey, null);
+            const hasConfig = !!config && Object.keys(config).length > 0;
+            log(`检查配置: key=${configKey}, hasConfig=${hasConfig}, config=${JSON.stringify(config)}`);
+            return hasConfig;
+        },
+
+        /**
+         * 获取范围显示文本
+         * @param {number} scope - 范围
+         * @param {Object} t - 翻译对象
+         * @returns {string} 显示文本
+         */
+        getScopeText(scope, t) {
+            return scope === 1 ? t.subdomain : scope === 2 ? t.topLevelDomain : t.allWebsites;
+        },
+
+        /**
+         * 获取当前配置来源文本
+         * @param {Object} t - 翻译对象
+         * @returns {string} 配置来源文本
+         */
+        getCurrentConfigText(t) {
+            this.initKeys();
+            const subdomainConfig = GM_getValue(this.subdomainKey, {});
+            const topLevelConfig = GM_getValue(this.topLevelKey, {});
+            const globalConfig = GM_getValue(this.GLOBAL_DEFAULT_KEY, {});
+            if (Object.keys(subdomainConfig).length > 0) return window.location.hostname;
+            if (Object.keys(topLevelConfig).length > 0) return `*.${Utils.getTopLevelDomain().replace(/^\./, '')}`;
+            if (Object.keys(globalConfig).length > 0) return t.allWebsites;
+            return t.notConfigured;
+        },
+
+        /**
+         * 获取配置范围显示文本（包含目标范围）
+         * @param {Object} t - 翻译对象
+         * @returns {string} 显示文本
+         */
+        getConfigScopeDisplayText(t) {
+            const effectiveScope = this.getEffectiveScope();
+            const currentScopeText = this.getScopeText(effectiveScope, t);
+            const pendingScope = State.get('pendingScopeChange');
+            if (pendingScope && pendingScope !== effectiveScope) {
+                const targetScopeText = this.getScopeText(pendingScope, t);
+                return `${currentScopeText} -> ${targetScopeText}`;
+            }
+            return currentScopeText;
+        },
+
+        /**
+         * 删除指定范围的配置
+         * @param {number} scope - 范围
+         * @returns {boolean} 是否删除成功
+         */
+        deleteConfig(scope) {
+            this.initKeys();
+            const t = translations[State.get('currentLanguage')] || translations.en;
+            let key, target;
+            if (scope === 1) {
+                key = this.subdomainKey;
+                target = window.location.hostname;
+            } else if (scope === 2) {
+                key = this.topLevelKey;
+                target = `*.${Utils.getTopLevelDomain().replace(/^\./, '')}`;
+            } else {
+                key = this.GLOBAL_DEFAULT_KEY;
+                target = t.allWebsites;
+            }
+            GM_setValue(key, {});
+            log(`删除配置: ${target}`);
+            return true;
+        }
+    };
+
+    // --- 配置管理 ---
+    const ConfigManager = {
+        /**
+         * 加载配置
+         */
+        loadConfig() {
+            ConfigScopeManager.initKeys();
+            let config = GM_getValue(ConfigScopeManager.subdomainKey, {});
+            let effectiveScope = 1;
+            if (Object.keys(config).length === 0) {
+                config = GM_getValue(ConfigScopeManager.topLevelKey, {});
+                effectiveScope = 2;
+                if (Object.keys(config).length === 0) {
+                    config = GM_getValue(ConfigScopeManager.GLOBAL_DEFAULT_KEY, {});
+                    effectiveScope = Object.keys(config).length > 0 ? 3 : 1; // 空全局配置时默认子域名
+                }
+            }
+            State.set('fontIncrement', config.increment || 1);
+            State.set('currentFontFamily', config.fontFamily || 'none');
+            State.set('currentAdjustment', config.resize || 0);
+            State.set('watchDOMChanges', config.watcher || false);
+            State.set('intervalSeconds', config.timer || 0);
+            State.set('firstAdjustment', config.first || false);
+            State.set('firstAdjustmentTime', config.firstTime || 3);
+            State.set('targetScope', effectiveScope);
+            log('加载配置:', config, '生效范围:', effectiveScope);
+        },
+
+        /**
+         * 保存配置
+         */
+        saveConfig() {
+            const t = translations[State.get('currentLanguage')] || translations.en;
+            // 使用 pendingScopeChange（若存在），否则使用 targetScope
+            let scope = State.get('pendingScopeChange') !== null ? State.get('pendingScopeChange') : State.get('targetScope');
+            // 如果配置已修改且无 pendingScopeChange，优先使用 UI 显示的 scope
+            if (State.get('isConfigModified') && State.get('pendingScopeChange') === null) {
+                scope = ConfigScopeManager.getEffectiveScope();
+                if (scope === 3 && Object.keys(GM_getValue(ConfigScopeManager.GLOBAL_DEFAULT_KEY, {})).length === 0) {
+                    scope = 1; // 无全局配置时，默认子域名
+                }
+            }
+            const scopeText = ConfigScopeManager.getScopeText(scope, t);
+            const target = scope === 1 ? window.location.hostname :
+                scope === 2 ? `*.${Utils.getTopLevelDomain().replace(/^\./, '')}` : t.allWebsites;
+            const confirmMessage = scope === 3 ?
+                t.saveConfigConfirm.replace('{scope}', scopeText).replace(' [{target}]', '') :
+                t.saveConfigConfirm.replace('{scope}', scopeText).replace('{target}', target);
+
+            if (confirm(confirmMessage)) {
+                const config = {
+                    increment: State.get('fontIncrement'),
+                    resize: State.get('currentAdjustment'),
+                    watcher: State.get('watchDOMChanges'),
+                    timer: State.get('intervalSeconds'),
+                    fontFamily: State.get('currentFontFamily'),
+                    first: State.get('firstAdjustment'),
+                    firstTime: State.get('firstAdjustmentTime')
+                };
+                ConfigScopeManager.initKeys();
+                const key = scope === 1 ? ConfigScopeManager.subdomainKey :
+                    scope === 2 ? ConfigScopeManager.topLevelKey : ConfigScopeManager.GLOBAL_DEFAULT_KEY;
+                GM_setValue(key, config);
+                State.set('isConfigModified', false);
+                State.set('targetScope', scope);
+                State.set('pendingScopeChange', null);
+                ConfigManager.loadConfig(); // 刷新配置
+                UIManager.updateUI();
+                log(`保存配置到: ${target} (scope=${scope})`);
+            }
+        },
+
+        /**
+         * 更改配置范围
+         */
+        changeConfigScope() {
+            const t = translations[State.get('currentLanguage')] || translations.en;
+            const effectiveScope = ConfigScopeManager.getEffectiveScope();
+            const currentScopeText = ConfigScopeManager.getScopeText(effectiveScope, t);
+            const input = prompt(
+                t.configScopePrompt
+                    .replace('{scope}', currentScopeText)
+                    .replace('{hostname}', window.location.hostname)
+                    .replace('{tld}', Utils.getTopLevelDomain().replace(/^\./, '')),
+                State.get('targetScope')
+            );
+            const newScope = parseInt(input, 10);
+            if (![1, 2, 3].includes(newScope)) {
+                if (input !== null) alert(t.invalidInput);
+                return;
+            }
+            if (newScope === effectiveScope) {
+                log(`新范围与当前范围相同: ${ConfigScopeManager.scopeMap[newScope]}`);
+                return;
+            }
+            ConfigScopeManager.initKeys();
+            const hasConfig = effectiveScope === 1 ? Object.keys(GM_getValue(ConfigScopeManager.subdomainKey, {})).length > 0 :
+                effectiveScope === 2 ? Object.keys(GM_getValue(ConfigScopeManager.topLevelKey, {})).length > 0 :
+                    Object.keys(GM_getValue(ConfigScopeManager.GLOBAL_DEFAULT_KEY, {})).length > 0;
+
+            if (newScope > effectiveScope && hasConfig) {
+                const confirmMessage = effectiveScope === 3 ?
+                    `${t.currentConfigScope}: ${ConfigScopeManager.getCurrentConfigText(t)}\n${t.deleteBeforeScopeChangeConfirm.replace('{scope}', ConfigScopeManager.getScopeText(effectiveScope, t)).replace(' [{target}]', '')}` :
+                    `${t.currentConfigScope}: ${ConfigScopeManager.getCurrentConfigText(t)}\n${t.deleteBeforeScopeChangeConfirm.replace('{scope}', ConfigScopeManager.getScopeText(effectiveScope, t)).replace('{target}', ConfigScopeManager.getCurrentConfigText(t))}`;
+                if (confirm(confirmMessage)) {
+                    ConfigScopeManager.deleteConfig(effectiveScope);
+                    State.set('pendingScopeChange', newScope);
+                    State.set('targetScope', newScope);
+                    State.set('isConfigModified', true);
+                    UIManager.updateUI();
+                    log(`标记范围更改为: ${ConfigScopeManager.scopeMap[newScope]}`);
+                }
+            } else {
+                State.set('pendingScopeChange', newScope);
+                State.set('targetScope', newScope);
+                State.set('isConfigModified', true);
+                UIManager.updateUI();
+                log(`标记范围更改为: ${ConfigScopeManager.scopeMap[newScope]}`);
+            }
+        },
+
+        /**
+         * 删除当前配置
+         */
+        deleteCurrentConfig() {
+            const effectiveScope = ConfigScopeManager.getEffectiveScope();
+            const t = translations[State.get('currentLanguage')] || translations.en;
+            const scopeText = ConfigScopeManager.getScopeText(effectiveScope, t);
+            const target = ConfigScopeManager.getCurrentConfigText(t);
+
+            if (target === t.notConfigured) {
+                log('无配置可删除');
+                return false;
+            }
+
+            const confirmMessage = effectiveScope === 3 ?
+                `${t.currentConfigScope}: ${target}\n${t.deleteConfigConfirm.replace('{scope}', scopeText).replace(' [{target}]', '')}` :
+                `${t.currentConfigScope}: ${target}\n${t.deleteConfigConfirm.replace('{scope}', scopeText).replace('{target}', target)}`;
+
+            if (confirm(confirmMessage)) {
+                ConfigScopeManager.deleteConfig(effectiveScope);
+                State.set('targetScope', 1); // 强制设为子域名
+                State.set('pendingScopeChange', null); // 清空待定范围
+                ConfigManager.loadConfig();
+                UIManager.updateUI();
+                log('配置已删除，targetScope 重置为 1');
+                return true;
+            }
+            return false;
+        }
+    };
+
+    // --- 字体管理 ---
+    const FontManager = {
+        supportFonts: [
+            'custom', 'auto', 'Arial', 'cursive', 'fangsong', 'fantasy', 'monospace', 'none',
+            'sans-serif', 'serif', 'system-ui', 'ui-monospace', 'ui-rounded', 'ui-sans-serif',
+            'ui-serif', '-webkit-body', 'inherit', 'initial', 'unset', 'Verdana', 'Helvetica',
+            'Tahoma', 'Times New Roman', 'Georgia', 'Courier New', 'Comic Sans MS'
+        ],
+        styleCache: new WeakMap(),
+
+        /**
+         * 获取缓存的计算样式
+         * @param {HTMLElement} el - 元素
+         * @returns {CSSStyleDeclaration} 计算样式
+         */
+        getCachedStyle(el) {
+            if (!this.styleCache.has(el)) {
+                this.styleCache.set(el, window.getComputedStyle(el));
+            }
+            return this.styleCache.get(el);
+        },
+
+        /**
+         * 递归遍历 DOM 元素
+         * @param {HTMLElement} el - 根元素
+         * @param {Function} callback - 回调函数
+         */
+        traverseDOM(el, callback) {
+            if (el.nodeType !== Node.ELEMENT_NODE || el.id === 'NiceFont_panel' || el.hasAttribute('data-nicefont-panel')) {
+                return;
+            }
+            callback(el);
+            if (el.tagName === 'IFRAME') {
+                try {
+                    const iframeDoc = el.contentDocument || el.contentWindow.document;
+                    if (iframeDoc) {
+                        this.traverseDOM(iframeDoc.body, callback);
+                        const font = State.get('currentFontFamily');
+                        if (font !== 'none') {
+                            iframeDoc.documentElement.style.setProperty('--nicefont-family', font);
+                        } else {
+                            iframeDoc.documentElement.style.removeProperty('--nicefont-family');
+                        }
+                    }
+                } catch (e) {
+                    console.error('[NiceFont] 访问 iframe 失败:', e);
+                }
+            }
+            if (el.shadowRoot) {
+                try {
+                    el.shadowRoot.querySelectorAll('*').forEach(child => this.traverseDOM(child, callback));
+                } catch (e) {
+                    console.error('[NiceFont] 处理 Shadow DOM 失败:', e);
+                }
+            }
+            Array.from(el.children).forEach(child => requestAnimationFrame(() => this.traverseDOM(child, callback)));
+        },
+
+        /**
+         * 应用字体调整
+         * @param {HTMLElement} el - 根元素
+         * @param {number} increment - 字体大小增量（px）
+         */
+        applyFontRecursively(el, increment) {
+            this.traverseDOM(el, (node) => {
+                const style = this.getCachedStyle(node);
+                const isVisible = style.display !== 'none' && style.visibility !== 'hidden';
+                if (Utils.hasVisibleText(node) && isVisible) {
+                    let currentFontSize = node.style.fontSize || style.fontSize;
+                    if (!node.hasAttribute('data-default-fontsize')) {
+                        node.setAttribute('data-default-fontsize', currentFontSize);
+                    }
+                    const baseFontSize = parseFloat(Utils.convertToPx(node, node.getAttribute('data-default-fontsize')));
+                    if (!isNaN(baseFontSize)) {
+                        node.style.fontSize = `${baseFontSize + increment}px`;
+                    }
+                }
+            });
+            const font = State.get('currentFontFamily');
+            if (font !== 'none') {
+                document.documentElement.style.setProperty('--nicefont-family', font);
+            } else {
+                document.documentElement.style.removeProperty('--nicefont-family');
+            }
+        },
+
+        /**
+         * 重置字体
+         * @param {HTMLElement} el - 根元素
+         */
+        resetFont(el) {
+            this.traverseDOM(el, (node) => {
+                const defaultSize = node.getAttribute('data-default-fontsize');
+                if (defaultSize) {
+                    node.style.fontSize = defaultSize;
+                    node.removeAttribute('data-default-fontsize');
+                } else {
+                    node.style.removeProperty('font-size');
+                }
+                node.style.removeProperty('font-family');
+            });
+            try {
+                document.documentElement.style.removeProperty('--nicefont-family');
+            } catch (e) {
+                console.error('[NiceFont] 移除 --nicefont-family 失败:', e);
+            }
+            // 重置关闭跟踪状态
+            GM_setValue('NiceFont_closeCount', 0);
+            GM_setValue('NiceFont_lastCloseTime', 0);
+            GM_setValue('NiceFont_autoOpenDisabled', false);
+            log('重置关闭跟踪状态');
+        },
+
+        /**
+         * 修改字体大小
+         * @param {number} increment - 增量（px）
+         */
+        changeFontSize(increment) {
+            State.set('currentAdjustment', State.get('currentAdjustment') + increment);
+            this.applyFontRecursively(document.body, State.get('currentAdjustment'));
+            State.set('isConfigModified', true);
+            UIManager.updateUI();
+            log(`字体大小调整: ${increment}px, 当前: ${State.get('currentAdjustment')}px`);
+        }
+    };
+
+    // --- 界面管理 ---
+    const UIManager = {
+        menuHandles: [],
+        panelCache: null,
+        overlayCache: null,
+        lastToggleTime: 0, // 用于防抖
+
+        /**
+         * 定义命令配置
+         * @returns {Array} 命令配置数组
+         */
+        getCommandsConfig() {
+            const t = translations[State.get('currentLanguage')] || translations.en;
+            return [
+                {
+                    id: 'setFontFamily',
+                    getText: () => `🔠 ${t.setFontFamily}: ${State.get('currentFontFamily')}`,
+                    action: () => {
+                        const t = translations[State.get('currentLanguage')] || translations.en;
+                        let select = document.getElementById('NiceFont_font-family');
+                        if (select) {
+                            select.remove();
+                            document.removeEventListener('click', this.closeDropdown);
+                            return;
+                        }
+                        select = document.createElement('select');
+                        select.id = 'NiceFont_font-family';
+                        select.className = 'font-family-select';
+                        select.innerHTML = FontManager.supportFonts.map(font =>
+                            `<option value="${font}" ${font === State.get('currentFontFamily') ? 'selected' : ''}>${font === 'custom' ? (State.get('currentLanguage') === 'zh' ? '手动输入' : 'Custom Input') : font}</option>`
+                        ).join('');
+                        const btn = document.getElementById('NiceFont_setFontFamily');
+                        if (btn) btn.appendChild(select);
+                        select.focus();
+                        select.addEventListener('click', e => e.stopPropagation());
+                        select.addEventListener('change', (e) => {
+                            const selectedFont = e.target.value;
+                            if (selectedFont === 'custom') {
+                                const input = prompt(`${t.setFontFamilyPrompt}\n\n${t.supportFontFamily}\n${FontManager.supportFonts.slice(0, -1).join(', ')}`, '');
+                                if (input && input.trim()) {
+                                    const newFont = input.trim();
+                                    if (!FontManager.supportFonts.includes(newFont)) {
+                                        FontManager.supportFonts.splice(FontManager.supportFonts.length - 1, 0, newFont);
+                                        const option = document.createElement('option');
+                                        option.value = newFont;
+                                        option.textContent = newFont;
+                                        select.insertBefore(option, select.lastChild);
+                                    }
+                                    State.set('currentFontFamily', newFont);
+                                    select.value = newFont;
+                                } else {
+                                    select.value = State.get('currentFontFamily');
+                                    select.remove();
+                                    document.removeEventListener('click', this.closeDropdown);
+                                    log('取消自定义字体输入');
+                                    return;
+                                }
+                            } else {
+                                State.set('currentFontFamily', selectedFont);
+                            }
+                            FontManager.applyFontRecursively(document.body, State.get('currentAdjustment'));
+                            State.set('isConfigModified', true);
+                            UIManager.updateUI();
+                            select.remove();
+                            document.removeEventListener('click', this.closeDropdown);
+                            log(`字体类型设置为: ${State.get('currentFontFamily')}`);
+                        });
+                        this.closeDropdown = (event) => {
+                            if (!select.contains(event.target) && !btn.contains(event.target)) {
+                                select.remove();
+                                document.removeEventListener('click', this.closeDropdown);
+                                log('下拉菜单关闭');
+                            }
+                        };
+                        document.addEventListener('click', this.closeDropdown);
+                    }
+                },
+                {
+                    id: 'status',
+                    getText: () => `📏 ${t.fontSizeAdjustment}: ${State.get('currentAdjustment') >= 0 ? '+' : ''}${State.get('currentAdjustment')}px`,
+                    action: () => { }
+                },
+                {
+                    id: 'increase',
+                    getText: () => `🔼 ${t.increase}`,
+                    action: () => FontManager.changeFontSize(State.get('fontIncrement')),
+                    autoClose: false
+                },
+                {
+                    id: 'decrease',
+                    getText: () => `🔽 ${t.decrease}`,
+                    action: () => FontManager.changeFontSize(-State.get('fontIncrement')),
+                    autoClose: false
+                },
+                {
+                    id: 'reset',
+                    getText: () => `🔄️ ${t.reset}`,
+                    action: () => {
+                        FontManager.resetFont(document.body);
+                        State.set('currentAdjustment', 0);
+                        State.set('currentFontFamily', 'none');
+                        State.set('watchDOMChanges', false);
+                        State.set('intervalSeconds', 0);
+                        State.set('firstAdjustment', false);
+                        State.set('firstAdjustmentTime', 3);
+                        if (State.get('observer')) {
+                            State.get('observer').disconnect();
+                            State.set('observer', null);
+                        }
+                        if (State.get('timer')) {
+                            clearInterval(State.get('timer'));
+                            State.set('timer', null);
+                        }
+                        State.set('isConfigModified', true);
+                        UIManager.updateUI();
+                        log('字体设置重置');
+                    }
+                },
+                {
+                    id: 'first-adjustment',
+                    getText: () => `1️⃣ ${State.get('firstAdjustment') ? t.firstAdjustmentEnabled : t.firstAdjustmentDisabled} ${State.get('firstAdjustment') ? `【${State.get('firstAdjustmentTime')}s】` : ''}`,
+                    action: () => {
+                        const input = prompt(t.firstAdjustmentConfirm, State.get('firstAdjustmentTime').toString());
+                        const secs = parseInt(input, 10);
+                        if (!isNaN(secs)) {
+                            State.set('firstAdjustment', !State.get('firstAdjustment'));
+                            State.set('firstAdjustmentTime', secs);
+                            if (secs === 0) State.set('firstAdjustment', false);
+                            if (State.get('firstAdjustment')) {
+                                setTimeout(() => {
+                                    FontManager.applyFontRecursively(document.body, State.get('currentAdjustment'));
+                                    log('应用首次字体调整');
+                                }, State.get('firstAdjustmentTime') * 1000);
+                            }
+                            State.set('isConfigModified', true);
+                            if (this.panelCache) {
+                                this.updatePanelContent();
+                            }
+                            log(`首次调整设置为: ${secs}s`);
+                        }
+                    }
+                },
+                {
+                    id: 'timer-adjustment',
+                    getText: () => `⏱️ ${State.get('intervalSeconds') > 0 ? t.timerAdjustmentEnabled : t.timerAdjustmentDisabled} ${State.get('intervalSeconds') > 0 ? `【${State.get('intervalSeconds')}s】` : ''}`,
+                    action: () => {
+                        const input = prompt(t.timerPrompt, State.get('intervalSeconds').toString());
+                        const secs = parseInt(input, 10);
+                        if (!isNaN(secs)) {
+                            State.set('intervalSeconds', secs);
+                            if (secs > 0) {
+                                State.set('watchDOMChanges', false);
+                                if (State.get('observer')) State.get('observer').disconnect();
+                                if (State.get('timer')) clearInterval(State.get('timer'));
+                                State.set('timer', setInterval(() => {
+                                    FontManager.applyFontRecursively(document.body, State.get('currentAdjustment'));
+                                }, secs * 1000));
+                                log(`定时调整设置为: ${secs}s`);
+                            } else {
+                                if (State.get('timer')) clearInterval(State.get('timer'));
+                                log('定时调整禁用');
+                            }
+                            State.set('isConfigModified', true);
+                            if (this.panelCache) {
+                                this.updatePanelContent();
+                            }
+                            log(`定时调整设置为: ${secs}s`);
+                        }
+                    }
+                },
+                {
+                    id: 'dynamic-adjustment',
+                    getText: () => `🔎 ${State.get('watchDOMChanges') ? t.dynamicAdjustmentEnabled : t.dynamicAdjustmentDisabled}`,
+                    action: () => {
+                        if (confirm(t.dynamicWatchConfirm)) {
+                            State.set('watchDOMChanges', !State.get('watchDOMChanges'));
+                            if (State.get('watchDOMChanges')) {
+                                State.set('intervalSeconds', 0);
+                                if (State.get('timer')) clearInterval(State.get('timer'));
+                                const nodeCount = document.body.getElementsByTagName('*').length;
+                                const throttleTime = nodeCount > 10000 ? 200 : 100;
+                                State.set('observer', new MutationObserver(Utils.throttle(() => {
+                                    FontManager.applyFontRecursively(document.body, State.get('currentAdjustment'));
+                                }, throttleTime)));
+                                State.get('observer').observe(document.body, { childList: true, subtree: true });
+                                log('动态调整启用');
+                            } else {
+                                if (State.get('observer')) State.get('observer').disconnect();
+                                log('动态调整禁用');
+                            }
+                            State.set('isConfigModified', true);
+                            if (this.panelCache) {
+                                this.updatePanelContent();
+                            }
+                        }
+                    }
+                },
+                {
+                    id: 'switch-language',
+                    getText: () => `🌐 ${t.usageLanguage}: ${State.get('currentLanguage')}`,
+                    action: () => {
+                        let input;
+                        do {
+                            input = prompt('zh: 汉语 \t en: English \t ko: 한국어 \t ja: 日本語 \t ru: Русский \t fr: Français \t de: Deutsch \t es: Español \t pt: Português', State.get('currentLanguage'));
+                            if (input && !Object.keys(translations).includes(input.trim())) {
+                                alert('Invalid language code!');
+                            }
+                        } while (input && !Object.keys(translations).includes(input.trim()));
+                        if (input && input.trim()) {
+                            State.set('currentLanguage', input.trim());
+                            GM_setValue('language', State.get('currentLanguage'));
+                            UIManager.updateUI();
+                            if (this.panelCache) {
+                                this.panelCache.remove();
+                                this.overlayCache.remove();
+                                this.createFloatingPanel();
+                            }
+                            log(`语言切换为: ${State.get('currentLanguage')}`);
+                        }
+                    }
+                },
+                {
+                    id: 'switch-panel',
+                    getText: () => `🎨 ${t.switchPanel}: ${State.get('panelType') === 'tampermonkey' ? t.tampermonkeyPanel : t.floatingPanel}`,
+                    action: () => {
+                        const newPanelType = State.get('panelType') === 'tampermonkey' ? 'floating' : 'tampermonkey';
+                        GM_setValue(ConfigScopeManager.PANEL_TYPE_KEY, newPanelType);
+                        State.set('panelType', newPanelType);
+                        if (this.panelCache) {
+                            this.panelCache.remove();
+                            this.overlayCache.remove();
+                            this.panelCache = null;
+                            this.overlayCache = null;
+                        }
+                        UIManager.updateUI();
+                        log(`切换到面板类型: ${newPanelType}`);
+                    }
+                },
+                {
+                    id: 'show-panel',
+                    getText: () => `📅 ${t.showPanel}`,
+                    action: () => this.togglePanel(),
+                    tampermonkeyOnly: true
+                },
+                {
+                    id: 'currentConfigScope',
+                    getText: () => `📍 ${t.currentConfigScope}: ${ConfigScopeManager.getCurrentConfigText(t)}`,
+                    action: ConfigManager.deleteCurrentConfig
+                },
+                {
+                    id: 'config-scope',
+                    getText: () => `ℹ️ ${t.configScope}: ${ConfigScopeManager.getConfigScopeDisplayText(t)}`,
+                    action: ConfigManager.changeConfigScope
+                },
+                {
+                    id: 'save-config',
+                    getText: () => `💾 ${State.get('isConfigModified') ? t.saveConfigPending : t.saveConfig}`,
+                    action: ConfigManager.saveConfig
+                }
+            ];
+        },
+
+        /**
+         * 创建浮动面板
+         */
+        createFloatingPanel() {
+            if (this.panelCache) {
+                log('panelCache 已存在，跳过创建');
+                return;
+            }
+            const t = translations[State.get('currentLanguage')] || translations.en;
+            const scriptName = GM_info?.script?.name || 'NiceFont';
+
+            // 初始化面板
+            this.panelCache = document.createElement('div');
+            this.panelCache.id = 'NiceFont_panel';
+            this.panelCache.setAttribute('data-nicefont-panel', 'true');
+            this.panelCache.style.position = 'fixed';
+            this.panelCache.style.width = '300px';
+            this.panelCache.style.background = '#fff';
+            this.panelCache.style.border = '1px solid #ccc';
+            this.panelCache.style.borderRadius = '5px';
+            this.panelCache.style.padding = '10px';
+            this.panelCache.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
+            this.panelCache.style.zIndex = '10001';
+            this.panelCache.style.fontFamily = 'sans-serif';
+            this.panelCache.style.fontSize = '15px';
+            this.panelCache.style.userSelect = 'none';
+
+            // 初始化遮罩层
+            this.overlayCache = document.createElement('div');
+            this.overlayCache.id = 'NiceFont_overlay';
+            this.overlayCache.style.display = 'none';
+
+            // 加载保存的面板位置
+            const savedPosition = GM_getValue('NiceFont_panelPosition', { top: '50px', right: '20px' });
+            this.panelCache.style.top = savedPosition.top;
+            this.panelCache.style.right = savedPosition.right;
+            this.panelCache.style.left = 'auto';
+
+            // 设置面板内容
+            this.panelCache.innerHTML = `
+                <div class="NiceFont_header" style="position: relative; z-index: 10002; display: flex; align-items: center; justify-content: space-between;">
+                    <div style="font-size: 16px; text-align: left; flex-grow: 1; cursor: grab; margin: 5px; font-weight: bold;">${scriptName}</div>
+                    <button class="NiceFont_close-btn" id="NiceFont_close-btn" style="border: none; border-radius: 3px; padding: 1px 6px; cursor: pointer; line-height: 16px; font-size: 12px; background: none; color: #000;">✖️</button>
+                </div>
+                <div class="NiceFont_content"></div>
+            `;
+
+            // 填充内容区域
+            this.updatePanelContent();
+
+            // 确保 DOM 可用并添加面板
+            try {
+                if (document.body) {
+                    document.body.appendChild(this.overlayCache);
+                    document.body.appendChild(this.panelCache);
+                    log('浮动面板创建成功');
+                } else {
+                    console.error('[NiceFont] document.body 不可用');
+                    return;
+                }
+            } catch (e) {
+                console.error('[NiceFont] 创建面板失败:', e);
+                return;
+            }
+
+            // 获取 header 元素
+            const header = this.panelCache.querySelector('.NiceFont_header');
+            if (!header) {
+                console.error('[NiceFont] 未找到 .NiceFont_header，无法绑定拖拽事件');
+                return;
+            }
+
+            // 添加拖动功能
+            let isDragging = false;
+            let initialX;
+            let initialY;
+            let rafId = null;
+
+            header.addEventListener('mousedown', (e) => {
+                if (e.target.classList.contains('NiceFont_close-btn')) {
+                    log('点击关闭按钮，忽略拖拽');
+                    return;
+                }
+                isDragging = true;
+                initialX = e.clientX + parseFloat(this.panelCache.style.right || '0');
+                initialY = e.clientY - parseFloat(this.panelCache.style.top || '0');
+                header.style.cursor = 'grabbing';
+                log('开始拖拽');
+                e.preventDefault();
+                e.stopPropagation();
+            }, { capture: true, passive: false });
+
+            document.addEventListener('mousemove', (e) => {
+                if (isDragging) {
+                    e.preventDefault();
+                    if (rafId) cancelAnimationFrame(rafId);
+                    rafId = requestAnimationFrame(() => {
+                        let newX = initialX - e.clientX;
+                        let newY = e.clientY - initialY;
+                        newX = Math.max(0, Math.min(newX, window.innerWidth - this.panelCache.offsetWidth));
+                        newY = Math.max(0, Math.min(newY, window.innerHeight - this.panelCache.offsetHeight));
+                        this.panelCache.style.right = `${newX}px`;
+                        this.panelCache.style.top = `${newY}px`;
+                        this.panelCache.style.left = 'auto';
+                        log(`拖拽中: right=${newX}px, top=${newY}px`);
+                    });
+                }
+            }, { capture: true, passive: false });
+
+            document.addEventListener('mouseup', (e) => {
+                if (isDragging) {
+                    isDragging = false;
+                    header.style.cursor = 'grab';
+                    if (rafId) {
+                        cancelAnimationFrame(rafId);
+                        rafId = null;
+                    }
+                    GM_setValue('NiceFont_panelPosition', {
+                        top: this.panelCache.style.top,
+                        right: this.panelCache.style.right
+                    });
+                    log('拖拽结束, 面板位置保存:', this.panelCache.style.top, this.panelCache.style.right);
+                    e.stopPropagation();
+                }
+            }, { capture: true, passive: false });
+
+            // 添加长按功能
+            let longPressTimer = null;
+            const startLongPress = (action, interval = 100) => {
+                action();
+                longPressTimer = setInterval(action, interval);
+            };
+            const stopLongPress = () => {
+                if (longPressTimer) {
+                    clearInterval(longPressTimer);
+                    longPressTimer = null;
+                }
+            };
+
+            this.panelCache.addEventListener('mousedown', (e) => {
+                const btn = e.target.closest('.action-btn');
+                if (btn) {
+                    const commandId = btn.id.replace('NiceFont_', '');
+                    if (commandId === 'increase' || commandId === 'decrease') {
+                        const command = this.getCommandsConfig().find(c => c.id === commandId);
+                        if (command) {
+                            startLongPress(command.action);
+                        }
+                    }
+                }
+            }, { capture: false });
+
+            this.panelCache.addEventListener('mouseup', stopLongPress, { capture: false });
+            this.panelCache.addEventListener('mouseleave', stopLongPress, { capture: false });
+
+            // 绑定点击事件
+            this.panelCache.addEventListener('click', (e) => {
+                const btn = e.target.closest('.action-btn');
+                if (btn) {
+                    const command = this.getCommandsConfig().find(c => c.id === btn.id.replace('NiceFont_', ''));
+                    if (command && command.id !== 'increase' && command.id !== 'decrease') {
+                        log(`执行命令: ${command.id}`);
+                        command.action();
+                    }
+                }
+                if (e.target.id === 'NiceFont_close-btn') {
+                    this.panelCache.style.display = 'none';
+                    this.overlayCache.style.display = 'none';
+                    // 检查是否因无配置自动弹出
+                    if (!ConfigScopeManager.hasConfig()) {
+                        const now = Date.now();
+                        const lastCloseTime = GM_getValue('NiceFont_lastCloseTime', 0);
+                        let closeCount = GM_getValue('NiceFont_closeCount', 0);
+
+                        if (now - lastCloseTime > CLOSE_TRACKING_WINDOW) {
+                            // 重置计数（超出时间窗口）
+                            closeCount = 0;
+                            log('关闭计数重置（超出时间窗口）');
+                        }
+
+                        closeCount += 1;
+                        GM_setValue('NiceFont_closeCount', closeCount);
+                        GM_setValue('NiceFont_lastCloseTime', now);
+                        log(`面板关闭（无配置源）: closeCount=${closeCount}, lastCloseTime=${now}`);
+
+                        if (closeCount >= CLOSE_COUNT_THRESHOLD) {
+                            GM_setValue('NiceFont_autoOpenDisabled', true);
+                            log('禁用无配置源自动弹出（连续关闭达到阈值）');
+                        }
+                    } else {
+                        log('面板关闭（有配置源）');
+                    }
+                }
+                e.stopPropagation();
+            }, { capture: false });
+        },
+
+        /**
+         * 更新面板内容
+         */
+        updatePanelContent() {
+            if (!this.panelCache) return;
+            const t = translations[State.get('currentLanguage')] || translations.en;
+            const contentContainer = this.panelCache.querySelector('.NiceFont_content');
+            if (contentContainer) {
+                contentContainer.innerHTML = this.getCommandsConfig()
+                    .filter(cmd => !cmd.tampermonkeyOnly)
+                    .map(cmd =>
+                        `<div class="action-btn" id="NiceFont_${cmd.id}">${cmd.getText()}</div>`
+                    ).join('');
+                log('面板内容更新成功');
+            } else {
+                console.error('[NiceFont] 未找到 .NiceFont_content，无法更新内容');
+            }
+        },
+
+        /**
+         * 更新油猴菜单
+         */
+        updateTampermonkeyMenu() {
+            this.menuHandles.forEach(handle => {
+                try {
+                    GM_unregisterMenuCommand(handle);
+                } catch (e) {
+                    console.error('[NiceFont] 取消注册菜单失败:', e);
+                }
+            });
+            this.menuHandles = [];
+            const commands = State.get('panelType') === 'tampermonkey'
+                ? this.getCommandsConfig().filter(cmd => cmd.id !== 'show-panel')
+                : this.getCommandsConfig().filter(cmd => ['switch-panel', 'show-panel'].includes(cmd.id));
+            commands.forEach(cmd => {
+                const handle = GM_registerMenuCommand(cmd.getText(), () => {
+                    cmd.action();
+                    log(`执行油猴菜单命令: ${cmd.id}`);
+                }, { autoClose: cmd.autoClose });
+                this.menuHandles.push(handle);
+                log(`注册菜单: ${cmd.id}`);
+            });
+        },
+
+        /**
+         * 显示/隐藏面板
+         */
+        togglePanel() {
+            if (State.get('panelType') !== 'floating') return;
+            const now = Date.now();
+            if (now - this.lastToggleTime < 300) {
+                log('togglePanel 防抖，忽略快速重复调用');
+                return;
+            }
+            this.lastToggleTime = now;
+            if (!this.panelCache) {
+                this.createFloatingPanel();
+                if (this.panelCache) {
+                    this.panelCache.style.display = 'block';
+                    this.overlayCache.style.display = 'block';
+                    log('面板显示状态: block (新建)');
+                }
+            } else {
+                const isHidden = this.panelCache.style.display === 'none';
+                const display = isHidden ? 'block' : 'none';
+                this.panelCache.style.display = display;
+                this.overlayCache.style.display = display;
+                log(`面板显示状态: ${display}`);
+            }
+        },
+
+        /**
+         * 更新界面
+         */
+        updateUI() {
+            log('调用 updateUI, panelType:', State.get('panelType'));
+            if (State.get('panelType') === 'tampermonkey') {
+                this.updateTampermonkeyMenu();
+                if (this.panelCache) {
+                    this.panelCache.remove();
+                    this.overlayCache.remove();
+                    this.panelCache = null;
+                    this.overlayCache = null;
+                    log('移除浮动面板（切换到油猴菜单）');
+                }
+            } else {
+                this.updateTampermonkeyMenu();
+                const hasConfig = ConfigScopeManager.hasConfig();
+                const autoOpenDisabled = GM_getValue('NiceFont_autoOpenDisabled', false);
+                if (!this.panelCache && !hasConfig && !autoOpenDisabled) {
+                    this.createFloatingPanel();
+                    if (this.panelCache) {
+                        this.panelCache.style.display = 'block';
+                        this.overlayCache.style.display = 'block';
+                        log('自动创建并显示浮动面板（无配置且未禁用自动弹出）');
+                    }
+                } else if (this.panelCache) {
+                    this.updatePanelContent();
+                    log('更新已有面板内容');
+                } else {
+                    log('跳过自动创建面板（已有配置、已禁用自动弹出或面板已移除）');
+                }
+                const t = translations[State.get('currentLanguage')] || translations.en;
+                const saveBtn = this.panelCache?.querySelector('#NiceFont_save-config');
+                if (saveBtn) {
+                    saveBtn.textContent = `💾 ${State.get('isConfigModified') ? t.saveConfigPending : t.saveConfig}`;
+                }
+            }
+        }
+    };
+
+    // --- 多语言支持 ---
+    // 支持的多语言：汉语(zh)、英语(en)、韩语(ko)、日语(ja)、俄语(ru)、法语(fr)、德语(de)、西班牙语(es)、葡萄牙语(pt)
     const translations = {
         zh: {
             increase: '增大字体',
             decrease: '减小字体',
-            reset: '重置字体',
-            reapply: '应用字体变化',
+            reset: '恢复字体',
             fontSizeAdjustment: '字体大小调整',
-            setFontIncrement: '字体大小增量',
-            setFontIncrementPrompt: '请输入字体增量（单位：像素）：',
-            setFontIncrementErrorAlert: '请输入有效的增量值（大于0的整数）！',
-            setFontFamily: '设置字体类型',
+            setFontFamily: '字体类型调整',
             setFontFamilyPrompt: '请输入字体类型',
             supportFontFamily: '支持的字体类型：',
             invalidFontFamilyAlert: '请输入有效的字体类型！',
@@ -139,11 +1188,7 @@
             increase: 'Increase Font',
             decrease: 'Decrease Font',
             reset: 'Reset Font',
-            reapply: 'Apply Font Changes',
             fontSizeAdjustment: 'Font Size Adjustment',
-            setFontIncrement: 'Font Size Increment',
-            setFontIncrementPrompt: 'Enter font increment (pixels):',
-            setFontIncrementErrorAlert: 'Please enter a valid increment value (positive integer)!',
             setFontFamily: 'Set Font Family',
             setFontFamilyPrompt: 'Enter font family',
             supportFontFamily: 'Supported font families:',
@@ -180,15 +1225,11 @@
             increase: '글꼴 확대',
             decrease: '글꼴 축소',
             reset: '글꼴 초기화',
-            reapply: '글꼴 변경 적용',
             fontSizeAdjustment: '글꼴 크기 조정',
-            setFontIncrement: '글꼴 크기 증가량',
-            setFontIncrementPrompt: '글꼴 증가량을 입력하세요 (단위: 픽셀):',
-            setFontIncrementErrorAlert: '유효한 증가량 값(0보다 큰 정수)을 입력하세요!',
-            setFontFamily: '글꼴 종류 설정',
-            setFontFamilyPrompt: '글꼴 종류를 입력하세요',
-            supportFontFamily: '지원되는 글꼴 종류:',
-            invalidFontFamilyAlert: '유효한 글꼴 종류를 입력하세요!',
+            setFontFamily: '글꼴 설정',
+            setFontFamilyPrompt: '글꼴을 입력하세요',
+            supportFontFamily: '지원되는 글꼴:',
+            invalidFontFamilyAlert: '유효한 글꼴을 입력하세요!',
             firstAdjustmentConfirm: '첫 조정 시간 입력 (초, 0은 비활성화):',
             firstAdjustmentEnabled: '첫 글꼴 조정: ✔️',
             firstAdjustmentDisabled: '첫 글꼴 조정: ✖️',
@@ -208,28 +1249,24 @@
             topLevelDomain: '최상위 도메인',
             allWebsites: '모든 웹사이트',
             configScopePrompt: '설정 범위를 입력하세요:\n1: 서브도메인 ({hostname})\n2: 최상위 도메인 ({tld})\n3: 모든 웹사이트\n현재 범위: {scope}',
-            invalidInput: '유효한 범위(1, 2, 또는 3)를 입력하세요!',
+            invalidInput: '유효한 범위를 입력하세요 (1, 2, 또는 3)!',
             currentConfigScope: '현재 설정 범위',
             notConfigured: '설정되지 않음',
             saveConfig: '설정 저장',
             saveConfigPending: '설정 저장 (확인 필요)',
-            saveConfigConfirm: '설정을 다음에 저장: {scope} [{target}]?',
-            deleteConfigConfirm: '현재 설정을 삭제하시겠습니까? (삭제: {scope} [{target}])',
-            deleteBeforeScopeChangeConfirm: '더 넓은 범위로 변경하려면 현재 설정을 삭제해야 합니다.\n현재 설정을 삭제하시겠습니까? (삭제: {scope} [{target}])'
+            saveConfigConfirm: '설정을 다음에 저장하시겠습니까: {scope} [{target}]?',
+            deleteConfigConfirm: '현재 설정을 삭제하시겠습니까? (삭제될 항목: {scope} [{target}])',
+            deleteBeforeScopeChangeConfirm: '더 넓은 범위로 변경하려면 현재 설정을 삭제해야 합니다.\n현재 설정을 삭제하시겠습니까? (삭제될 항목: {scope} [{target}])'
         },
         ja: {
             increase: 'フォントを大きくする',
             decrease: 'フォントを小さくする',
             reset: 'フォントをリセット',
-            reapply: 'フォントの変更を適用',
-            fontSizeAdjustment: 'フォントサイズの調整',
-            setFontIncrement: 'フォントサイズの増分',
-            setFontIncrementPrompt: 'フォントの増分を入力してください（単位：ピクセル）：',
-            setFontIncrementErrorAlert: '有効な増分値（0より大きい整数）を入力してください！',
-            setFontFamily: 'フォントの種類を設定',
-            setFontFamilyPrompt: 'フォントの種類を入力してください',
-            supportFontFamily: 'サポートされているフォントの種類：',
-            invalidFontFamilyAlert: '有効なフォントの種類を入力してください！',
+            fontSizeAdjustment: 'フォントサイズ調整',
+            setFontFamily: 'フォントファミリー設定',
+            setFontFamilyPrompt: 'フォントファミリーを入力してください',
+            supportFontFamily: 'サポートされているフォントファミリー：',
+            invalidFontFamilyAlert: '有効なフォントファミリーを入力してください！',
             firstAdjustmentConfirm: '初回調整時間を入力してください（秒、0で無効）：',
             firstAdjustmentEnabled: '初回フォント調整：✔️',
             firstAdjustmentDisabled: '初回フォント調整：✖️',
@@ -244,37 +1281,33 @@
             tampermonkeyPanel: 'Tampermonkeyメニュー',
             floatingPanel: 'ページメニュー',
             showPanel: 'パネルを表示',
-            configScope: '設定の適用範囲',
+            configScope: '設定範囲',
             subdomain: 'サブドメイン',
             topLevelDomain: 'トップレベルドメイン',
             allWebsites: 'すべてのウェブサイト',
-            configScopePrompt: '設定の適用範囲を入力してください：\n1: サブドメイン ({hostname})\n2: トップレベルドメイン ({tld})\n3: すべてのウェブサイト\n現在の範囲: {scope}',
+            configScopePrompt: '設定範囲を入力してください：\n1: サブドメイン ({hostname})\n2: トップレベルドメイン ({tld})\n3: すべてのウェブサイト\n現在の範囲: {scope}',
             invalidInput: '有効な範囲（1、2、または3）を入力してください！',
             currentConfigScope: '現在の設定範囲',
             notConfigured: '未設定',
             saveConfig: '設定を保存',
-            saveConfigPending: '設定を保存（確定が必要）',
-            saveConfigConfirm: '設定を以下に保存しますか：{scope} [{target}]？',
-            deleteConfigConfirm: '現在の設定を削除しますか？（削除：{scope} [{target}]）',
-            deleteBeforeScopeChangeConfirm: 'より広い範囲に変更するには、現在の設定を削除する必要があります。\n現在の設定を削除しますか？（削除：{scope} [{target}]）'
+            saveConfigPending: '設定を保存（確認が必要）',
+            saveConfigConfirm: '設定を保存しますか：{scope} [{target}]？',
+            deleteConfigConfirm: '現在の設定を削除しますか？（削除対象：{scope} [{target}]）',
+            deleteBeforeScopeChangeConfirm: 'より広い範囲に変更するには、現在の設定を削除する必要があります。\n現在の設定を削除しますか？（削除対象：{scope} [{target}]）'
         },
         ru: {
             increase: 'Увеличить шрифт',
             decrease: 'Уменьшить шрифт',
             reset: 'Сбросить шрифт',
-            reapply: 'Применить изменения шрифта',
             fontSizeAdjustment: 'Регулировка размера шрифта',
-            setFontIncrement: 'Шаг увеличения шрифта',
-            setFontIncrementPrompt: 'Введите шаг увеличения шрифта (в пикселях):',
-            setFontIncrementErrorAlert: 'Введите корректное значение шага (положительное целое число)!',
-            setFontFamily: 'Установить тип шрифта',
-            setFontFamilyPrompt: 'Введите тип шрифта',
-            supportFontFamily: 'Поддерживаемые типы шрифтов:',
-            invalidFontFamilyAlert: 'Введите корректный тип шрифта!',
-            firstAdjustmentConfirm: 'Введите время первой настройки (в секундах, 0 для отключения):',
+            setFontFamily: 'Установить семейство шрифтов',
+            setFontFamilyPrompt: 'Введите семейство шрифтов',
+            supportFontFamily: 'Поддерживаемые семейства шрифтов:',
+            invalidFontFamilyAlert: 'Пожалуйста, введите действительное семейство шрифтов!',
+            firstAdjustmentConfirm: 'Введите время первой настройки (секунды, 0 для отключения):',
             firstAdjustmentEnabled: 'Первая настройка шрифта: ✔️',
             firstAdjustmentDisabled: 'Первая настройка шрифта: ✖️',
-            timerPrompt: 'Введите интервал настройки таймера (в секундах, 0 для отключения):',
+            timerPrompt: 'Введите интервал таймера настройки (секунды, 0 для отключения):',
             timerAdjustmentEnabled: 'Настройка шрифта по таймеру: ✔️',
             timerAdjustmentDisabled: 'Настройка шрифта по таймеру: ✖️',
             dynamicWatchConfirm: 'Включить/отключить динамическую настройку?',
@@ -286,36 +1319,32 @@
             floatingPanel: 'Меню страницы',
             showPanel: 'Показать панель',
             configScope: 'Область конфигурации',
-            subdomain: 'Поддомен',
+            subdomain: 'Субдомен',
             topLevelDomain: 'Домен верхнего уровня',
             allWebsites: 'Все веб-сайты',
-            configScopePrompt: 'Введите область конфигурации:\n1: Поддомен ({hostname})\n2: Домен верхнего уровня ({tld})\n3: Все веб-сайты\nТекущая область: {scope}',
-            invalidInput: 'Введите корректную область (1, 2 или 3)!',
+            configScopePrompt: 'Введите область конфигурации:\n1: Субдомен ({hostname})\n2: Домен верхнего уровня ({tld})\n3: Все веб-сайты\nТекущая область: {scope}',
+            invalidInput: 'Пожалуйста, введите действительную область (1, 2 или 3)!',
             currentConfigScope: 'Текущая область конфигурации',
             notConfigured: 'Не настроено',
             saveConfig: 'Сохранить конфигурацию',
             saveConfigPending: 'Сохранить конфигурацию (ожидает подтверждения)',
             saveConfigConfirm: 'Сохранить конфигурацию в: {scope} [{target}]?',
-            deleteConfigConfirm: 'Удалить текущую конфигурацию? (Удалится: {scope} [{target}])',
-            deleteBeforeScopeChangeConfirm: 'Для изменения на более широкую область необходимо удалить текущую конфигурацию.\nУдалить текущую конфигурацию? (Удалится: {scope} [{target}])'
+            deleteConfigConfirm: 'Вы уверены, что хотите удалить текущую конфигурацию? (Будет удалено: {scope} [{target}])',
+            deleteBeforeScopeChangeConfirm: 'Для изменения на более широкую область необходимо удалить текущую конфигурацию.\nВы уверены, что хотите удалить текущую конфигурацию? (Будет удалено: {scope} [{target}])'
         },
         fr: {
             increase: 'Augmenter la police',
             decrease: 'Réduire la police',
             reset: 'Réinitialiser la police',
-            reapply: 'Appliquer les changements de police',
             fontSizeAdjustment: 'Ajustement de la taille de la police',
-            setFontIncrement: 'Incrément de la taille de la police',
-            setFontIncrementPrompt: 'Entrez l’incrément de la police (en pixels) :',
-            setFontIncrementErrorAlert: 'Veuillez entrer une valeur d’incrément valide (entier positif) !',
             setFontFamily: 'Définir la famille de polices',
             setFontFamilyPrompt: 'Entrez la famille de polices',
             supportFontFamily: 'Familles de polices prises en charge :',
             invalidFontFamilyAlert: 'Veuillez entrer une famille de polices valide !',
-            firstAdjustmentConfirm: 'Entrez le temps du premier ajustement (en secondes, 0 pour désactiver) :',
+            firstAdjustmentConfirm: 'Entrez le temps du premier ajustement (secondes, 0 pour désactiver) :',
             firstAdjustmentEnabled: 'Premier ajustement de police : ✔️',
             firstAdjustmentDisabled: 'Premier ajustement de police : ✖️',
-            timerPrompt: 'Entrez l’intervalle d’ajustement du minuteur (en secondes, 0 pour désactiver) :',
+            timerPrompt: 'Entrez l’intervalle d’ajustement du minuteur (secondes, 0 pour désactiver) :',
             timerAdjustmentEnabled: 'Ajustement de police par minuteur : ✔️',
             timerAdjustmentDisabled: 'Ajustement de police par minuteur : ✖️',
             dynamicWatchConfirm: 'Activer/désactiver l’ajustement dynamique ?',
@@ -332,31 +1361,27 @@
             allWebsites: 'Tous les sites web',
             configScopePrompt: 'Entrez la portée de la configuration :\n1 : Sous-domaine ({hostname})\n2 : Domaine de premier niveau ({tld})\n3 : Tous les sites web\nPortée actuelle : {scope}',
             invalidInput: 'Veuillez entrer une portée valide (1, 2 ou 3) !',
-            currentConfigScope: 'Portée de la configuration actuelle',
+            currentConfigScope: 'Portée de configuration actuelle',
             notConfigured: 'Non configuré',
             saveConfig: 'Enregistrer la configuration',
             saveConfigPending: 'Enregistrer la configuration (en attente)',
             saveConfigConfirm: 'Enregistrer la configuration dans : {scope} [{target}] ?',
-            deleteConfigConfirm: 'Supprimer la configuration actuelle ? (Supprimera : {scope} [{target}])',
-            deleteBeforeScopeChangeConfirm: 'Changer pour une portée plus large nécessite la suppression de la configuration actuelle.\nSupprimer la configuration actuelle ? (Supprimera : {scope} [{target}])'
+            deleteConfigConfirm: 'Êtes-vous sûr de vouloir supprimer la configuration actuelle ? (Supprimera : {scope} [{target}])',
+            deleteBeforeScopeChangeConfirm: 'Changer pour une portée plus large nécessite de supprimer la configuration actuelle.\nÊtes-vous sûr de vouloir supprimer la configuration actuelle ? (Supprimera : {scope} [{target}])'
         },
         de: {
             increase: 'Schriftart vergrößern',
             decrease: 'Schriftart verkleinern',
             reset: 'Schriftart zurücksetzen',
-            reapply: 'Schriftänderungen anwenden',
             fontSizeAdjustment: 'Schriftgrößenanpassung',
-            setFontIncrement: 'Schriftgrößeninkrement',
-            setFontIncrementPrompt: 'Geben Sie das Schriftgrößeninkrement ein (in Pixeln):',
-            setFontIncrementErrorAlert: 'Bitte geben Sie einen gültigen Inkrementwert ein (positive Ganzzahl)!',
-            setFontFamily: 'Schriftartfamilie festlegen',
-            setFontFamilyPrompt: 'Geben Sie die Schriftartfamilie ein',
-            supportFontFamily: 'Unterstützte Schriftartfamilien:',
-            invalidFontFamilyAlert: 'Bitte geben Sie eine gültige Schriftartfamilie ein!',
-            firstAdjustmentConfirm: 'Geben Sie die Zeit für die erste Anpassung ein (in Sekunden, 0 zum Deaktivieren):',
+            setFontFamily: 'Schriftfamilie festlegen',
+            setFontFamilyPrompt: 'Geben Sie die Schriftfamilie ein',
+            supportFontFamily: 'Unterstützte Schriftfamilien:',
+            invalidFontFamilyAlert: 'Bitte geben Sie eine gültige Schriftfamilie ein!',
+            firstAdjustmentConfirm: 'Geben Sie die Zeit für die erste Anpassung ein (Sekunden, 0 zum Deaktivieren):',
             firstAdjustmentEnabled: 'Erste Schrifteinstellung: ✔️',
             firstAdjustmentDisabled: 'Erste Schrifteinstellung: ✖️',
-            timerPrompt: 'Geben Sie das Intervall für die Timer-Anpassung ein (in Sekunden, 0 zum Deaktivieren):',
+            timerPrompt: 'Geben Sie das Intervall für die Timer-Anpassung ein (Sekunden, 0 zum Deaktivieren):',
             timerAdjustmentEnabled: 'Timer-Schrifteinstellung: ✔️',
             timerAdjustmentDisabled: 'Timer-Schrifteinstellung: ✖️',
             dynamicWatchConfirm: 'Dynamische Anpassung aktivieren/deaktivieren?',
@@ -377,68 +1402,60 @@
             notConfigured: 'Nicht konfiguriert',
             saveConfig: 'Konfiguration speichern',
             saveConfigPending: 'Konfiguration speichern (ausstehend)',
-            saveConfigConfirm: 'Konfiguration speichern unter: {scope} [{target}]?',
-            deleteConfigConfirm: 'Aktuelle Konfiguration löschen? (Löscht: {scope} [{target}])',
-            deleteBeforeScopeChangeConfirm: 'Das Ändern auf einen breiteren Bereich erfordert das Löschen der aktuellen Konfiguration.\nAktuelle Konfiguration löschen? (Löscht: {scope} [{target}])'
+            saveConfigConfirm: 'Konfiguration speichern in: {scope} [{target}]?',
+            deleteConfigConfirm: 'Möchten Sie die aktuelle Konfiguration wirklich löschen? (Wird gelöscht: {scope} [{target}])',
+            deleteBeforeScopeChangeConfirm: 'Zum Wechseln zu einem breiteren Bereich muss die aktuelle Konfiguration gelöscht werden.\nMöchten Sie die aktuelle Konfiguration wirklich löschen? (Wird gelöscht: {scope} [{target}])'
         },
         es: {
             increase: 'Aumentar fuente',
             decrease: 'Reducir fuente',
             reset: 'Restablecer fuente',
-            reapply: 'Aplicar cambios de fuente',
             fontSizeAdjustment: 'Ajuste del tamaño de fuente',
-            setFontIncrement: 'Incremento del tamaño de fuente',
-            setFontIncrementPrompt: 'Ingrese el incremento de fuente (en píxeles):',
-            setFontIncrementErrorAlert: '¡Ingrese un valor de incremento válido (entero positivo)!',
             setFontFamily: 'Establecer familia de fuentes',
             setFontFamilyPrompt: 'Ingrese la familia de fuentes',
-            supportFontFamily: 'Familias de fuentes soportadas:',
-            invalidFontFamilyAlert: '¡Ingrese una familia de fuentes válida!',
-            firstAdjustmentConfirm: 'Ingrese el tiempo del primer ajuste (en segundos, 0 para desactivar):',
+            supportFontFamily: 'Familias de fuentes compatibles:',
+            invalidFontFamilyAlert: '¡Por favor, ingrese una familia de fuentes válida!',
+            firstAdjustmentConfirm: 'Ingrese el tiempo del primer ajuste (segundos, 0 para desactivar):',
             firstAdjustmentEnabled: 'Primer ajuste de fuente: ✔️',
             firstAdjustmentDisabled: 'Primer ajuste de fuente: ✖️',
-            timerPrompt: 'Ingrese el intervalo de ajuste del temporizador (en segundos, 0 para desactivar):',
+            timerPrompt: 'Ingrese el intervalo de ajuste del temporizador (segundos, 0 para desactivar):',
             timerAdjustmentEnabled: 'Ajuste de fuente por temporizador: ✔️',
             timerAdjustmentDisabled: 'Ajuste de fuente por temporizador: ✖️',
             dynamicWatchConfirm: '¿Activar/desactivar el ajuste dinámico?',
             dynamicAdjustmentEnabled: 'Ajuste dinámico de fuente: ✔️',
             dynamicAdjustmentDisabled: 'Ajuste dinámico de fuente: ✖️',
             usageLanguage: 'Cambiar idioma del menú',
-            switchPanel: 'Cambiar panel de menú',
+            switchPanel: 'Cambiar panel del menú',
             tampermonkeyPanel: 'Menú de Tampermonkey',
             floatingPanel: 'Menú de página',
             showPanel: 'Mostrar panel',
             configScope: 'Alcance de la configuración',
             subdomain: 'Subdominio',
-            topLevelDomain: 'Dominio de primer nivel',
+            topLevelDomain: 'Dominio de nivel superior',
             allWebsites: 'Todos los sitios web',
-            configScopePrompt: 'Ingrese el alcance de la configuración:\n1: Subdominio ({hostname})\n2: Dominio de primer nivel ({tld})\n3: Todos los sitios web\nAlcance actual: {scope}',
-            invalidInput: '¡Ingrese un alcance válido (1, 2 o 3)!',
+            configScopePrompt: 'Ingrese el alcance de la configuración:\n1: Subdominio ({hostname})\n2: Dominio de nivel superior ({tld})\n3: Todos los sitios web\nAlcance actual: {scope}',
+            invalidInput: '¡Por favor, ingrese un alcance válido (1, 2 o 3)!',
             currentConfigScope: 'Alcance de configuración actual',
             notConfigured: 'No configurado',
             saveConfig: 'Guardar configuración',
             saveConfigPending: 'Guardar configuración (pendiente)',
             saveConfigConfirm: '¿Guardar configuración en: {scope} [{target}]?',
-            deleteConfigConfirm: '¿Eliminar la configuración actual? (Se eliminará: {scope} [{target}])',
-            deleteBeforeScopeChangeConfirm: 'Cambiar a un alcance más amplio requiere eliminar la configuración actual.\n¿Eliminar la configuración actual? (Se eliminará: {scope} [{target}])'
+            deleteConfigConfirm: '¿Está seguro de que desea eliminar la configuración actual? (Se eliminará: {scope} [{target}])',
+            deleteBeforeScopeChangeConfirm: 'Cambiar a un alcance más amplio requiere eliminar la configuración actual.\n¿Está seguro de que desea eliminar la configuración actual? (Se eliminará: {scope} [{target}])'
         },
         pt: {
             increase: 'Aumentar fonte',
             decrease: 'Diminuir fonte',
             reset: 'Redefinir fonte',
-            reapply: 'Aplicar mudanças de fonte',
             fontSizeAdjustment: 'Ajuste do tamanho da fonte',
-            setFontIncrement: 'Incremento do tamanho da fonte',
-            setFontIncrementPrompt: 'Digite o incremento da fonte (em pixels):',
-            setFontIncrementErrorAlert: 'Por favor, insira um valor de incremento válido (inteiro positivo)!',
             setFontFamily: 'Definir família de fontes',
             setFontFamilyPrompt: 'Digite a família de fontes',
             supportFontFamily: 'Famílias de fontes suportadas:',
             invalidFontFamilyAlert: 'Por favor, insira uma família de fontes válida!',
-            firstAdjustmentConfirm: 'Digite o tempo do primeiro ajuste (em segundos, 0 para desativar):',
+            firstAdjustmentConfirm: 'Digite o tempo do primeiro ajuste (segundos, 0 para desativar):',
             firstAdjustmentEnabled: 'Primeiro ajuste de fonte: ✔️',
             firstAdjustmentDisabled: 'Primeiro ajuste de fonte: ✖️',
-            timerPrompt: 'Digite o intervalo de ajuste do temporizador (em segundos, 0 para desativar):',
+            timerPrompt: 'Digite o intervalo de ajuste do temporizador (segundos, 0 para desativar):',
             timerAdjustmentEnabled: 'Ajuste de fonte por temporizador: ✔️',
             timerAdjustmentDisabled: 'Ajuste de fonte por temporizador: ✖️',
             dynamicWatchConfirm: 'Ativar/desativar ajuste dinâmico?',
@@ -451,451 +1468,30 @@
             showPanel: 'Mostrar painel',
             configScope: 'Escopo da configuração',
             subdomain: 'Subdomínio',
-            topLevelDomain: 'Domínio de topo',
+            topLevelDomain: 'Domínio de nível superior',
             allWebsites: 'Todos os sites',
-            configScopePrompt: 'Digite o escopo da configuração:\n1: Subdomínio ({hostname})\n2: Domínio de topo ({= ({tld})\n3: Todos os sites\nEscopo atual: {scope}',
+            configScopePrompt: 'Digite o escopo da configuração:\n1: Subdomínio ({hostname})\n2: Domínio de nível superior ({tld})\n3: Todos os sites\nEscopo atual: {scope}',
             invalidInput: 'Por favor, insira um escopo válido (1, 2 ou 3)!',
-            currentConfigScope: 'Escopo da configuração atual',
+            currentConfigScope: 'Escopo de configuração atual',
             notConfigured: 'Não configurado',
             saveConfig: 'Salvar configuração',
             saveConfigPending: 'Salvar configuração (pendente)',
             saveConfigConfirm: 'Salvar configuração em: {scope} [{target}]?',
             deleteConfigConfirm: 'Tem certeza de que deseja excluir a configuração atual? (Será excluído: {scope} [{target}])',
-            deleteBeforeScopeChangeConfirm: 'Mudar para um escopo mais amplo requer a exclusão da configuração atual.\nTem certeza de que deseja excluir a configuração atual? (Será excluído: {scope} [{target}])'
+            deleteBeforeScopeChangeConfirm: 'Mudar para um escopo mais amplo exige a exclusão da configuração atual.\nTem certeza de que deseja excluir a configuração atual? (Será excluído: {scope} [{target}])'
         }
     };
 
-    // 读取语言设置
-    let currentLanguage = GM_getValue('language', navigator.language);
-    if (!translations[currentLanguage]) {
-        currentLanguage = currentLanguage.startsWith('zh') ? 'zh' : 'en';
-        GM_setValue('language', currentLanguage);
-    }
-    log(`NiceFont: 语言设置为 ${currentLanguage}`);
-
-    // 检查是否首次使用，默认为浮动面板
-    let panelType = GM_getValue(PANEL_TYPE_KEY, null);
-    if (panelType === null) {
-        panelType = 'floating';
-        GM_setValue(PANEL_TYPE_KEY, panelType);
-        log(`NiceFont: 面板类型默认设置为 ${panelType}`);
-    }
-
-    // 按优先级读取配置
-    let subdomainConfig = GM_getValue(SUBDOMAIN_STORAGE_KEY, {});
-    let topLevelConfig = GM_getValue(TOPLEVEL_STORAGE_KEY, {});
-    let globalDefaultConfig = GM_getValue(GLOBAL_DEFAULT_KEY, {});
-
-    // 确定当前使用的配置
-    let currentConfig = subdomainConfig;
-    let effectiveScope = 1; // 默认子域名
-    if (Object.keys(subdomainConfig).length === 0) {
-        currentConfig = topLevelConfig;
-        effectiveScope = 2; // 顶级域名
-        if (Object.keys(topLevelConfig).length === 0) {
-            currentConfig = globalDefaultConfig;
-            effectiveScope = 3; // 所有网站
-        }
-    }
-
-    // 获取字体类型配置
-    let fontIncrement = currentConfig.increment || 1;
-    let currentFontFamily = currentConfig.fontFamily || 'none';
-    let currentAdjustment = currentConfig.resize || 0;
-    let watchDOMChanges = currentConfig.watcher ?? false;
-    let intervalSeconds = currentConfig.timer || 0;
-    let firstAdjustment = currentConfig.first ?? false;
-    let firstAdjustmentTime = currentConfig.firstTime || 3;
-
-    let observer = null;
-    let timer = null;
-    let menuHandles = [];
-    let isConfigModified = false; // 跟踪配置是否被修改
-    // 在全局作用域中添加标志变量和待更改状态
-    let isScopeChangeDeletion = false;
-    let pendingScopeChange = null; // 待更改的配置范围
-
-    // 更新保存按钮文字
-    function updateSaveButton() {
-        const t = translations[currentLanguage] || translations['en'];
-        const saveBtn = document.getElementById('NiceFont_save-config-btn');
-        if (saveBtn) {
-            saveBtn.textContent = `💾 ${isConfigModified ? t.saveConfigPending : t.saveConfig}`;
-        }
-    }
-
-    // 获取当前配置来源的显示文本（无“->”）
-    function getCurrentConfigScopeText() {
-        const t = translations[currentLanguage] || translations['en'];
-        const subdomainConfig = GM_getValue(SUBDOMAIN_STORAGE_KEY, {});
-        const topLevelConfig = GM_getValue(TOPLEVEL_STORAGE_KEY, {});
-        const globalDefaultConfig = GM_getValue(GLOBAL_DEFAULT_KEY, {});
-
-        if (Object.keys(subdomainConfig).length > 0) {
-            return window.location.hostname; // 子域名
-        } else if (Object.keys(topLevelConfig).length > 0) {
-            const tld = getTopLevelDomain().replace(/^\./, ''); // 移除前置 .
-            return `*.${tld}`; // 顶级域名
-        } else if (Object.keys(globalDefaultConfig).length > 0) {
-            return t.allWebsites; // 所有网站
-        } else {
-            return t.notConfigured; // 未配置
-        }
-    }
-
-    // 获取配置作用范围的显示文本（仅显示范围名称）
-    function getConfigScopeDisplayText() {
-        const t = translations[currentLanguage] || translations['en'];
-        const currentScopeText = effectiveScope === 1 ? t.subdomain :
-            effectiveScope === 2 ? t.topLevelDomain : t.allWebsites;
-
-        // 如果没有配置（所有配置均为空），直接显示子域名或待更改范围
-        if (Object.keys(subdomainConfig).length === 0 &&
-            Object.keys(topLevelConfig).length === 0 &&
-            Object.keys(globalDefaultConfig).length === 0) {
-            const safeTargetScope = pendingScopeChange !== null ? pendingScopeChange : targetScope;
-            return safeTargetScope === 1 ? t.subdomain :
-                safeTargetScope === 2 ? t.topLevelDomain : t.allWebsites;
-        }
-
-        // 如果目标作用范围与当前配置范围不同，或有待更改范围，显示“当前 -> 目标”
-        const safeTargetScope = pendingScopeChange !== null ? pendingScopeChange : targetScope;
-        if (safeTargetScope !== effectiveScope || pendingScopeChange !== null) {
-            const targetScopeText = pendingScopeChange !== null ?
-                (pendingScopeChange === 1 ? t.subdomain :
-                    pendingScopeChange === 2 ? t.topLevelDomain : t.allWebsites) :
-                (safeTargetScope === 1 ? t.subdomain :
-                    safeTargetScope === 2 ? t.topLevelDomain : t.allWebsites);
-            return `${currentScopeText} -> ${targetScopeText}`;
-        }
-        return currentScopeText;
-    }
-
-    // 推断当前配置范围
-    function getCurrentConfigScope() {
-        const subdomainConfig = GM_getValue(SUBDOMAIN_STORAGE_KEY, {});
-        const topLevelConfig = GM_getValue(TOPLEVEL_STORAGE_KEY, {});
-        const globalDefaultConfig = GM_getValue(GLOBAL_DEFAULT_KEY, {});
-
-        if (Object.keys(subdomainConfig).length > 0) {
-            return 1; // 子域名
-        } else if (Object.keys(topLevelConfig).length > 0) {
-            return 2; // 顶级域名
-        } else if (Object.keys(globalDefaultConfig).length > 0) {
-            return 3; // 所有网站
-        } else {
-            return configScope; // 未配置时使用当前 configScope
-        }
-    }
-
-    // 删除当前配置
-    function deleteCurrentConfig() {
-        const t = translations[currentLanguage] || translations['en'];
-        let scopeText, scope, target;
-
-        // 确定实际保存的配置范围
-        if (Object.keys(subdomainConfig).length > 0) {
-            scope = 1;
-            scopeText = t.subdomain;
-            target = window.location.hostname;
-        } else if (Object.keys(topLevelConfig).length > 0) {
-            scope = 2;
-            scopeText = t.topLevelDomain;
-            target = `*.${getTopLevelDomain().replace(/^\./, '')}`;
-        } else if (Object.keys(globalDefaultConfig).length > 0) {
-            scope = 3;
-            scopeText = t.allWebsites;
-            target = t.allWebsites;
-        } else {
-            log('NiceFont: 无配置可删除');
-            return false; // 无配置时返回 false
-        }
-
-        // 仅在非作用范围更改删除时显示提示
-        let shouldDelete = isScopeChangeDeletion || confirm(
-            scope === 3
-                ? `${t.currentConfigScope}: ${getCurrentConfigScopeText()}\n${t.deleteConfigConfirm.replace('{scope}', scopeText).replace(' [{target}]', '')}`
-                : `${t.currentConfigScope}: ${getCurrentConfigScopeText()}\n${t.deleteConfigConfirm.replace('{scope}', scopeText).replace('{target}', getCurrentConfigScopeText())}`
-        );
-
-        if (shouldDelete) {
-            // 立即删除配置
-            if (scope === 1) {
-                GM_setValue(SUBDOMAIN_STORAGE_KEY, {});
-                log('NiceFont: 删除子域名配置', target);
-            } else if (scope === 2) {
-                GM_setValue(TOPLEVEL_STORAGE_KEY, {});
-                log('NiceFont: 删除顶级域名配置', target);
-            } else {
-                GM_setValue(GLOBAL_DEFAULT_KEY, {});
-                log('NiceFont: 删除所有网站配置');
-            }
-
-            // 更新配置状态
-            subdomainConfig = GM_getValue(SUBDOMAIN_STORAGE_KEY, {});
-            topLevelConfig = GM_getValue(TOPLEVEL_STORAGE_KEY, {});
-            globalDefaultConfig = GM_getValue(GLOBAL_DEFAULT_KEY, {});
-            currentConfig = subdomainConfig;
-            effectiveScope = 1;
-            if (Object.keys(subdomainConfig).length === 0) {
-                currentConfig = topLevelConfig;
-                effectiveScope = 2;
-                if (Object.keys(topLevelConfig).length === 0) {
-                    currentConfig = globalDefaultConfig;
-                    effectiveScope = 3;
-                }
-            }
-            targetScope = 1; // 默认回到子域名
-
-            // 更新界面
-            updateMenuCommands();
-            updatePanelCommands();
-            updateSaveButton();
-            log('NiceFont: 配置已删除');
-            return true;
-        }
-        return false;
-    }
-
-    // 更改配置作用范围
-    function changeConfigScope() {
-        const t = translations[currentLanguage] || translations['en'];
-        const hostname = window.location.hostname;
-        const tld = getTopLevelDomain().replace(/^\./, ''); // 移除前置 .
-        const currentScopeText = effectiveScope === 1 ? t.subdomain :
-            effectiveScope === 2 ? t.topLevelDomain : t.allWebsites;
-
-        // 备份当前配置
-        const backupConfig = {
-            fontIncrement: fontIncrement,
-            currentAdjustment: currentAdjustment,
-            currentFontFamily: currentFontFamily,
-            watchDOMChanges: watchDOMChanges,
-            intervalSeconds: intervalSeconds,
-            firstAdjustment: firstAdjustment,
-            firstAdjustmentTime: firstAdjustmentTime,
-            observer: observer,
-            timer: timer
-        };
-
-        const input = prompt(
-            t.configScopePrompt
-                .replace('{scope}', currentScopeText)
-                .replace('{hostname}', hostname)
-                .replace('{tld}', tld), targetScope
-        );
-        const newScope = parseInt(input, 10);
-        if ([1, 2, 3].includes(newScope)) {
-            // 如果新范围与当前范围相同，直接返回
-            if (newScope === effectiveScope) {
-                log(`NiceFont: 新范围与当前范围相同 (${scopeMap[newScope]})，无需更改`);
-                return;
-            }
-
-            // 检查是否为更广的作用范围
-            if (newScope > effectiveScope) {
-                let currentScope, scopeText;
-
-                // 确定当前配置范围
-                if (effectiveScope === 1 && Object.keys(subdomainConfig).length > 0) {
-                    currentScope = 1;
-                    scopeText = t.subdomain;
-                } else if (effectiveScope === 2 && Object.keys(topLevelConfig).length > 0) {
-                    currentScope = 2;
-                    scopeText = t.topLevelDomain;
-                } else {
-                    // 无需删除，直接标记范围更改
-                    pendingScopeChange = newScope;
-                    targetScope = newScope;
-                    isConfigModified = true;
-                    updateMenuCommands();
-                    updatePanelCommands();
-                    updateSaveButton();
-                    log(`NiceFont: 标记配置范围更改为${scopeMap[newScope]}，无需删除配置`);
-                    return;
-                }
-
-                // 提示删除当前配置
-                const confirmMessage = currentScope === 3
-                    ? `${t.currentConfigScope}: ${getCurrentConfigScopeText()}\n${t.deleteBeforeScopeChangeConfirm.replace('{scope}', scopeText).replace(' [{target}]', '')}`
-                    : `${t.currentConfigScope}: ${getCurrentConfigScopeText()}\n${t.deleteBeforeScopeChangeConfirm.replace('{scope}', scopeText).replace('{target}', getCurrentConfigScopeText())}`;
-
-                // 设置标志以跳过 deleteCurrentConfig 的提示
-                isScopeChangeDeletion = true;
-                let deleted = false;
-                try {
-                    // 尝试删除当前配置
-                    deleted = deleteCurrentConfig();
-                } finally {
-                    // 重置标志
-                    isScopeChangeDeletion = false;
-                }
-
-                if (deleted) {
-                    // 标记新范围为待保存
-                    pendingScopeChange = newScope;
-                    targetScope = newScope;
-                    isConfigModified = true;
-                    updateMenuCommands();
-                    updatePanelCommands();
-                    updateSaveButton();
-                    log(`NiceFont: 标记配置范围更改为${scopeMap[newScope]}，已删除旧配置`);
-                } else {
-                    // 用户取消删除，恢复备份配置
-                    fontIncrement = backupConfig.fontIncrement;
-                    currentAdjustment = backupConfig.currentAdjustment;
-                    currentFontFamily = backupConfig.currentFontFamily;
-                    watchDOMChanges = backupConfig.watchDOMChanges;
-                    intervalSeconds = backupConfig.intervalSeconds;
-                    firstAdjustment = backupConfig.firstAdjustment;
-                    firstAdjustmentTime = backupConfig.firstAdjustmentTime;
-                    observer = backupConfig.observer;
-                    timer = backupConfig.timer;
-
-                    // 恢复页面字体
-                    if (fontIncrement !== 1 || currentAdjustment !== 0 || currentFontFamily !== 'none') {
-                        applyFontRecursively(document.body);
-                    }
-
-                    updateMenuCommands();
-                    updatePanelCommands();
-                    updateSaveButton();
-                    log('NiceFont: 用户取消删除，恢复原有配置');
-                    return;
-                }
-            } else {
-                // 较小的范围，直接标记更改
-                pendingScopeChange = newScope;
-                targetScope = newScope;
-                isConfigModified = true;
-                updateMenuCommands();
-                updatePanelCommands();
-                updateSaveButton();
-                log(`NiceFont: 标记配置范围更改为${scopeMap[newScope]}`);
-            }
-        } else if (input !== null) {
-            alert(t.invalidInput);
-        }
-    }
-
-    // 保存配置
-    function saveConfig() {
-        const t = translations[currentLanguage] || translations['en'];
-        const hostname = window.location.hostname;
-        const tld = getTopLevelDomain().replace(/^\./, ''); // 移除前置 .
-        const scopeText = (pendingScopeChange || targetScope) === 1 ? t.subdomain :
-            (pendingScopeChange || targetScope) === 2 ? t.topLevelDomain : t.allWebsites;
-        const target = (pendingScopeChange || targetScope) === 1 ? hostname :
-            (pendingScopeChange || targetScope) === 2 ? `*.${tld}` : t.allWebsites;
-
-        log(`NiceFont: 保存配置，targetScope=${pendingScopeChange || targetScope}, scopeText=${scopeText}, target=${target}`);
-
-        // 修正提示格式：当作用范围为“所有网站”时，只显示“所有网站”
-        const confirmMessage = (pendingScopeChange || targetScope) === 3
-            ? t.saveConfigConfirm.replace('{scope}', scopeText).replace(' [{target}]', '')
-            : t.saveConfigConfirm.replace('{scope}', scopeText).replace('{target}', target);
-
-        if (confirm(confirmMessage)) {
-            // 保存配置
-            const config = {
-                increment: fontIncrement,
-                resize: currentAdjustment,
-                watcher: watchDOMChanges,
-                timer: intervalSeconds,
-                fontFamily: currentFontFamily,
-                first: firstAdjustment,
-                firstTime: firstAdjustmentTime
-            };
-            const saveScope = pendingScopeChange || targetScope;
-            if (saveScope === 1) {
-                GM_setValue(SUBDOMAIN_STORAGE_KEY, config);
-                log('NiceFont: 保存到子域名', hostname);
-            } else if (saveScope === 2) {
-                GM_setValue(TOPLEVEL_STORAGE_KEY, config);
-                log('NiceFont: 保存到顶级域名', tld);
-            } else {
-                GM_setValue(GLOBAL_DEFAULT_KEY, config);
-                log('NiceFont: 保存到所有网站');
-            }
-
-            // 更新状态
-            isConfigModified = false;
-            if (pendingScopeChange !== null) {
-                targetScope = pendingScopeChange;
-                pendingScopeChange = null;
-            }
-
-            // 重载配置以反映保存后的状态
-            subdomainConfig = GM_getValue(SUBDOMAIN_STORAGE_KEY, {});
-            topLevelConfig = GM_getValue(TOPLEVEL_STORAGE_KEY, {});
-            globalDefaultConfig = GM_getValue(GLOBAL_DEFAULT_KEY, {});
-            currentConfig = subdomainConfig;
-            effectiveScope = 1;
-            if (Object.keys(subdomainConfig).length === 0) {
-                currentConfig = topLevelConfig;
-                effectiveScope = 2;
-                if (Object.keys(topLevelConfig).length === 0) {
-                    currentConfig = globalDefaultConfig;
-                    effectiveScope = 3;
-                }
-            }
-            targetScope = effectiveScope; // 同步目标作用范围
-
-            // 如果没有配置，重置字体设置
-            if (Object.keys(subdomainConfig).length === 0 &&
-                Object.keys(topLevelConfig).length === 0 &&
-                Object.keys(globalDefaultConfig).length === 0) {
-                fontIncrement = 1;
-                currentAdjustment = 0;
-                currentFontFamily = 'none';
-                watchDOMChanges = false;
-                intervalSeconds = 0;
-                firstAdjustment = false;
-                firstAdjustmentTime = 3;
-                // 停止动态观察和定时器
-                if (observer) {
-                    observer.disconnect();
-                    observer = null;
-                }
-                if (timer) {
-                    clearInterval(timer);
-                    timer = null;
-                }
-                // 重置页面字体
-                resetFont(document.body);
-            }
-
-            // 更新界面
-            updateMenuCommands();
-            updatePanelCommands();
-            updateSaveButton();
-        }
-    }
-
-    // 节流防抖
-    function throttle(fn, wait) {
-        let lastCall = 0;
-        return function (...args) {
-            const now = Date.now();
-            if (now - lastCall >= wait) {
-                lastCall = now;
-                fn(...args);
-            }
-        };
-    }
-
-    // CSS 样式：悬浮面板和遮罩层
+    // --- CSS 样式 ---
     GM_addStyle(`
         :root {
-            --nicefont-family: none; /* 定义全局字体类型变量 */
+            --nicefont-family: none;
         }
-        *:not(#NiceFont_panel):not([data-nicefont-panel]):not(.action-btn) {
-            font-family: var(--nicefont-family, inherit) !important; /* 应用字体类型，排除面板 */
+        *:not(#NiceFont_panel):not([data-nicefont-panel]):not(#NiceFont_panel *) {
+            font-family: var(--nicefont-family, inherit) !important;
         }
         #NiceFont_panel {
             position: fixed;
-            top: 20px;
-            right: 20px;
             width: 300px;
             background: #fff;
             border: 1px solid #ccc;
@@ -903,16 +1499,27 @@
             padding: 10px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.2);
             z-index: 10001;
-            font-family: sans-serif;
-            font-size: 14px;
+            font-family: sans-serif !important;
+            font-size: 15px;
+            user-select: none;
         }
-        #NiceFont_panel h3 {
-            margin: 0 0 10px;
-            font-size: 16px;
-            display: inline-block;
+        #NiceFont_panel .NiceFont_header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: relative;
+            z-index: 10002;
+        }
+        #NiceFont_panel .NiceFont_header > div {
+            font-size: 16px !important;
+            font-family: sans-serif !important;
+            text-align: left;
+            flex-grow: 1;
+            cursor: grab;
+            margin: 5px;
+            font-weight: bold;
         }
         #NiceFont_panel .NiceFont_close-btn {
-            float: right;
             border: none;
             border-radius: 3px;
             padding: 1px 6px;
@@ -935,7 +1542,7 @@
         #NiceFont_panel .action-btn:hover {
             text-decoration: underline;
         }
-        #NiceFont_panel .status {
+        #NiceFont_panel #NiceFont_set-font-size-btn {
             padding: 2px;
             text-decoration: none !important;
         }
@@ -949,810 +1556,63 @@
             font-size: 14px;
             vertical-align: middle;
         }
-        #NiceFont_overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: transparent;
-            z-index: 10000;
-            display: none;
-        }
     `);
 
-    // 创建浮动面板
-    function createFloatingPanel() {
-        const t = translations[currentLanguage] || translations['en'];
-        const scriptName = GM_info?.script?.name || 'NiceFont';
-        const currentScope = getCurrentConfigScope();
-        const scopeText = currentScope === 1 ? t.subdomain : currentScope === 2 ? t.topLevelDomain : t.allWebsites;
-        log('NiceFont: 创建浮动面板');
-        const panel = document.createElement('div');
-        panel.id = 'NiceFont_panel';
-        panel.setAttribute('data-nicefont-panel', 'true');
-        panel.innerHTML = `
-        <h3>${scriptName}</h3>
-        <button class="NiceFont_close-btn" id="NiceFont_close-btn">✖️</button>
-        <div class="action-btn status">📏 ${t.fontSizeAdjustment}: ${currentAdjustment >= 0 ? '+' : ''}${currentAdjustment}px</div>
-        <div class="action-btn" id="NiceFont_increase-btn">🔼 ${t.increase}</div>
-        <div class="action-btn" id="NiceFont_decrease-btn">🔽 ${t.decrease}</div>
-        <div class="action-btn" id="NiceFont_reset-btn">🔁 ${t.reset}</div>
-        <div class="action-btn" id="NiceFont_reapply-btn">♻️ ${t.reapply}</div>
-        <div class="action-btn" id="NiceFont_set-increment-btn">📈 ${t.setFontIncrement}: ${fontIncrement}px</div>
-        <div class="action-btn" id="NiceFont_set-font-family-btn">🖋️ ${t.setFontFamily}: ${currentFontFamily}</div>
-        <div class="action-btn" id="NiceFont_first-adjustment-btn">1️⃣ ${firstAdjustment ? t.firstAdjustmentEnabled : t.firstAdjustmentDisabled} ${firstAdjustment ? `【${firstAdjustmentTime}s】` : ''}</div>
-        <div class="action-btn" id="NiceFont_timer-adjustment-btn">⏱️ ${intervalSeconds > 0 ? t.timerAdjustmentEnabled : t.timerAdjustmentDisabled} ${intervalSeconds > 0 ? `【${intervalSeconds}s】` : ''}</div>
-        <div class="action-btn" id="NiceFont_dynamic-adjustment-btn">👁️ ${watchDOMChanges ? t.dynamicAdjustmentEnabled : t.dynamicAdjustmentDisabled}</div>
-        <div class="action-btn" id="NiceFont_switch-language-btn">🌐 ${t.usageLanguage}: ${currentLanguage}</div>
-        <div class="action-btn" id="NiceFont_switch-panel-btn">🎨 ${t.switchPanel}: ${panelType === 'tampermonkey' ? t.tampermonkeyPanel : t.floatingPanel}</div>
-        <div class="action-btn" id="NiceFont_config-currentConfigScope-btn">📍 ${t.currentConfigScope}: ${getCurrentConfigScopeText()}</div>
-        <div class="action-btn" id="NiceFont_config-scope-btn">ℹ️ ${t.configScope}: ${scopeText}</div>
-        <div class="action-btn" id="NiceFont_save-config-btn">💾 ${isConfigModified ? t.saveConfigPending : t.saveConfig}</div>
-    `;
-
-        const overlay = document.createElement('div');
-        overlay.id = 'NiceFont_overlay';
-        overlay.style.display = 'block';
-
-        try {
-            if (document.body) {
-                document.body.appendChild(overlay);
-                document.body.appendChild(panel);
-                log('NiceFont: 浮动面板和覆盖附加到主体');
-            } else {
-                log('NiceFont: document.body 不可用');
-                return;
-            }
-        } catch (e) {
-            log('NiceFont: 附加面板或覆盖层错误：', e);
-            return;
+    // --- 初始化 ---
+    /**
+     * 初始化脚本
+     */
+    function init() {
+        // 初始化语言
+        let lang = GM_getValue('language', navigator.language);
+        if (!translations[lang]) {
+            lang = lang.startsWith('zh') ? 'zh' : 'en';
+            GM_setValue('language', lang);
         }
+        State.set('currentLanguage', lang);
+        log(`语言设置为: ${lang}`);
 
-        // 事件绑定
-        const updateStatus = () => {
-            const statusEl = panel.querySelector('.status');
-            if (statusEl) {
-                statusEl.textContent = `📏 ${t.fontSizeAdjustment}: ${currentAdjustment >= 0 ? '+' : ''}${currentAdjustment}px`;
-            }
-        };
+        // 初始化面板类型
+        let panelType = GM_getValue(ConfigScopeManager.PANEL_TYPE_KEY, 'floating');
+        State.set('panelType', panelType);
+        log(`面板类型设置为: ${panelType}`);
 
-        const bindButton = (id, action) => {
-            const btn = document.getElementById(id);
-            if (btn) {
-                btn.addEventListener('click', action);
-            } else {
-                log(`NiceFont: 未找到按钮#${id}`);
-            }
-        };
+        // 加载配置
+        ConfigManager.loadConfig();
 
-        bindButton('NiceFont_increase-btn', () => {
-            changeFontSize(fontIncrement);
-            isConfigModified = true;
-            updateStatus();
-            updateSaveButton();
-        });
+        // 初始化界面
+        UIManager.updateUI();
 
-        bindButton('NiceFont_decrease-btn', () => {
-            changeFontSize(-fontIncrement);
-            isConfigModified = true;
-            updateStatus();
-            updateSaveButton();
-        });
-
-        bindButton('NiceFont_reset-btn', () => {
-            resetFont(document.body);
-            currentAdjustment = 0;
-            currentFontFamily = 'none';
-            watchDOMChanges = false;
-            intervalSeconds = 0;
-            firstAdjustment = false;
-            firstAdjustmentTime = 3;
-            if (observer) {
-                observer.disconnect();
-                observer = null;
-            }
-            if (timer) {
-                clearInterval(timer);
-                timer = null;
-            }
-            isConfigModified = true;
-            updateStatus();
-            updateMenuCommands();
-            updatePanelCommands();
-            updateSaveButton();
-            log('NiceFont: 字体设置重置，配置标记为修改');
-        });
-
-        bindButton('NiceFont_reapply-btn', () => {
-            applyFontRecursively(document.body, currentAdjustment);
-        });
-
-        bindButton('NiceFont_close-btn', () => {
-            panel.style.display = 'none';
-            overlay.style.display = 'none';
-            log('NiceFont: 面板关闭，屏蔽层隐藏');
-        });
-
-        bindButton('NiceFont_set-increment-btn', () => {
-            const input = prompt(t.setFontIncrementPrompt, fontIncrement.toString());
-            const newIncrement = parseInt(input, 10);
-            if (!isNaN(newIncrement) && newIncrement > 0) {
-                fontIncrement = newIncrement;
-                isConfigModified = true;
-                updateMenuCommands();
-                updatePanelCommands();
-                updateSaveButton();
-                log(`NiceFont: 字体增量设置为${newIncrement}px`);
-            } else {
-                alert(t.setFontIncrementErrorAlert);
-            }
-        });
-
-        bindButton('NiceFont_set-font-family-btn', (event) => {
-            event.stopPropagation();
-            const btn = document.getElementById('NiceFont_set-font-family-btn');
-            let select = document.getElementById('NiceFont_font-family');
-            if (select) {
-                select.remove();
-                document.removeEventListener('click', closeDropdown);
-                return;
-            }
-            select = document.createElement('select');
-            select.id = 'NiceFont_font-family';
-            select.className = 'font-family-select';
-            select.innerHTML = supportFonts.map(font =>
-                `<option value="${font}" ${font === currentFontFamily ? 'selected' : ''}>${font === 'custom' ? (currentLanguage === 'zh' ? '手动输入' : 'Custom Input') : font}</option>`
-            ).join('');
-            btn.appendChild(select);
-
-            select.focus();
-
-            select.addEventListener('click', (e) => {
-                e.stopPropagation();
-            });
-
-            select.addEventListener('change', (e) => {
-                const selectedFont = e.target.value;
-                if (selectedFont === 'custom') {
-                    const input = prompt(`${t.setFontFamilyPrompt}\n\n${t.supportFontFamily}\n${supportFonts.slice(0, -1).join(", ")}`, '');
-                    if (input && input.trim() !== '') {
-                        const newFont = input.trim();
-                        if (!supportFonts.includes(newFont)) {
-                            supportFonts.splice(supportFonts.length - 1, 0, newFont);
-                            const option = document.createElement('option');
-                            option.value = newFont;
-                            option.textContent = newFont;
-                            select.insertBefore(option, select.lastChild);
-                        }
-                        currentFontFamily = newFont;
-                        select.value = newFont;
-                    } else {
-                        alert(t.invalidFontFamilyAlert);
-                        select.value = currentFontFamily;
-                        select.remove();
-                        document.removeEventListener('click', closeDropdown);
-                        return;
-                    }
-                } else {
-                    currentFontFamily = selectedFont;
-                }
-                // 通过 :root 设置字体类型
-                if (currentFontFamily !== 'none') {
-                    document.documentElement.style.setProperty('--nicefont-family', currentFontFamily);
-                } else {
-                    document.documentElement.style.removeProperty('--nicefont-family');
-                }
-                isConfigModified = true;
-                btn.textContent = `🖋️ ${t.setFontFamily}: ${currentFontFamily}`;
-                select.remove();
-                document.removeEventListener('click', closeDropdown);
-                updateMenuCommands();
-                updatePanelCommands();
-                updateSaveButton();
-                log(`NiceFont: 字体类型设置为 ${currentFontFamily}`);
-            });
-
-            function closeDropdown(event) {
-                if (!select.contains(event.target) && !btn.contains(event.target)) {
-                    select.remove();
-                    document.removeEventListener('click', closeDropdown);
-                    log('NiceFont: 点击外部关闭下拉菜单');
-                }
-            }
-
-            document.addEventListener('click', closeDropdown);
-        });
-
-        bindButton('NiceFont_first-adjustment-btn', () => {
-            const input = prompt(t.firstAdjustmentConfirm, firstAdjustmentTime.toString());
-            const secs = parseInt(input, 10);
-            if (!isNaN(secs)) {
-                firstAdjustment = !firstAdjustment;
-                firstAdjustmentTime = secs;
-                if (secs === 0) {
-                    firstAdjustment = false;
-                }
-                if (firstAdjustment) {
+        // 初始化字体调整
+        window.addEventListener('load', () => {
+            if (State.get('currentAdjustment') !== 0 || State.get('currentFontFamily') !== 'none') {
+                if (State.get('firstAdjustment') && State.get('firstAdjustmentTime') > 0) {
                     setTimeout(() => {
-                        applyFontRecursively(document.body, currentAdjustment);
-                    }, firstAdjustmentTime * 1000);
+                        FontManager.applyFontRecursively(document.body, State.get('currentAdjustment'));
+                        log('应用首次字体调整');
+                    }, State.get('firstAdjustmentTime') * 1000);
                 }
-                isConfigModified = true;
-                updateMenuCommands();
-                updatePanelCommands();
-                updateSaveButton();
-                log(`NiceFont: 第一次调整字体已切换，时间设置为${secs}s`);
+                if (State.get('watchDOMChanges')) {
+                    if (State.get('timer')) clearInterval(State.get('timer'));
+                    const nodeCount = document.body.getElementsByTagName('*').length;
+                    const throttleTime = nodeCount > 10000 ? 200 : 100;
+                    State.set('observer', new MutationObserver(Utils.throttle(() => {
+                        FontManager.applyFontRecursively(document.body, State.get('currentAdjustment'));
+                    }, throttleTime)));
+                    State.get('observer').observe(document.body, { childList: true, subtree: true });
+                    log('动态调整启用');
+                } else if (State.get('intervalSeconds') > 0) {
+                    if (State.get('observer')) State.get('observer').disconnect();
+                    State.set('timer', setInterval(() => {
+                        FontManager.applyFontRecursively(document.body, State.get('currentAdjustment'));
+                    }, State.get('intervalSeconds') * 1000));
+                    log(`定时调整启用: ${State.get('intervalSeconds')}s`);
+                }
             }
         });
 
-        bindButton('NiceFont_timer-adjustment-btn', () => {
-            const input = prompt(t.timerPrompt, intervalSeconds.toString());
-            const secs = parseInt(input, 10);
-            if (!isNaN(secs)) {
-                intervalSeconds = secs;
-                if (intervalSeconds > 0) {
-                    watchDOMChanges = false;
-                    if (observer) observer.disconnect();
-                    if (timer) clearInterval(timer);
-                    timer = setInterval(() => {
-                        applyFontRecursively(document.body, currentAdjustment);
-                    }, intervalSeconds * 1000);
-                    log(`NiceFont: 定时调整字体已切换，时间设置为${secs}s`);
-                } else {
-                    if (timer) clearInterval(timer);
-                    log('NiceFont: 定时器已禁用');
-                }
-                isConfigModified = true;
-                updateMenuCommands();
-                updatePanelCommands();
-                updateSaveButton();
-            }
-        });
-
-        bindButton('NiceFont_dynamic-adjustment-btn', () => {
-            if (confirm(t.dynamicWatchConfirm)) {
-                watchDOMChanges = !watchDOMChanges;
-                if (watchDOMChanges) {
-                    intervalSeconds = 0;
-                    if (timer) clearInterval(timer);
-                    observer = new MutationObserver(throttle(() => {
-                        applyFontRecursively(document.body, currentAdjustment);
-                    }, 100));
-                    observer.observe(document.body, { childList: true, subtree: true });
-                    log('NiceFont: 动态调整字体已启用');
-                } else {
-                    if (observer) observer.disconnect();
-                    log('NiceFont: 动态调整字体已禁用');
-                }
-                isConfigModified = true;
-                updateMenuCommands();
-                updatePanelCommands();
-                updateSaveButton();
-            }
-        });
-
-        bindButton('NiceFont_config-currentConfigScope-btn', deleteCurrentConfig);
-
-        bindButton('NiceFont_config-scope-btn', changeConfigScope);
-
-        bindButton('NiceFont_switch-panel-btn', () => {
-            const newPanelType = panelType === 'tampermonkey' ? 'floating' : 'tampermonkey';
-            GM_setValue(PANEL_TYPE_KEY, newPanelType);
-            panelType = newPanelType;
-            updateMenuCommands();
-            panel.remove();
-            overlay.remove();
-            log(`NiceFont: 切换到面板类型：${newPanelType}`);
-        });
-
-        bindButton('NiceFont_switch-language-btn', () => {
-            let input;
-            do {
-                input = prompt(`zh: 汉语 \t en: English \t ko: 한국어 \t ja: 日本語 \t ru: Русский \t fr: Français \t de: Deutsch \t es: Español \t pt: Português`, currentLanguage);
-                if (input && Object.keys(translations).indexOf(input.trim()) === -1) {
-                    alert('Invalid language code!');
-                }
-            } while (input && Object.keys(translations).indexOf(input.trim()) === -1);
-            if (input && input.trim() !== "") {
-                currentLanguage = input.trim();
-                GM_setValue('language', currentLanguage);
-                updateMenuCommands();
-                panel.remove();
-                overlay.remove();
-                createFloatingPanel();
-                log(`NiceFont: 语言切换为 ${currentLanguage}`);
-            }
-        });
-
-        bindButton('NiceFont_save-config-btn', saveConfig);
+        log('脚本初始化完成');
     }
 
-    // 修改字体大小并保存配置、更新菜单
-    function changeFontSize(increment) {
-        currentAdjustment += increment;
-        applyFontRecursively(document.body, currentAdjustment);
-        updateMenuCommands();
-        updatePanelCommands();
-        log(`NiceFont: 字体大小改变${increment}px，当前调整：${currentAdjustment}px`);
-    }
-
-    // 更新面板命令
-    function updatePanelCommands() {
-        const t = translations[currentLanguage] || translations['en'];
-
-        const firstAdjustmentBtn = document.getElementById('NiceFont_first-adjustment-btn');
-        if (firstAdjustmentBtn) {
-            firstAdjustmentBtn.textContent = `1️⃣ ${firstAdjustment ? t.firstAdjustmentEnabled : t.firstAdjustmentDisabled} ${firstAdjustment ? `【${firstAdjustmentTime}s】` : ''}`;
-        }
-
-        const timerAdjustmentBtn = document.getElementById('NiceFont_timer-adjustment-btn');
-        if (timerAdjustmentBtn) {
-            timerAdjustmentBtn.textContent = `⏱️ ${intervalSeconds > 0 ? t.timerAdjustmentEnabled : t.timerAdjustmentDisabled} ${intervalSeconds > 0 ? `【${intervalSeconds}s】` : ''}`;
-        }
-
-        const dynamicAdjustmentBtn = document.getElementById('NiceFont_dynamic-adjustment-btn');
-        if (dynamicAdjustmentBtn) {
-            dynamicAdjustmentBtn.textContent = `👁️ ${watchDOMChanges ? t.dynamicAdjustmentEnabled : t.dynamicAdjustmentDisabled}`;
-        }
-
-        const incrementBtn = document.getElementById('NiceFont_set-increment-btn');
-        if (incrementBtn) {
-            incrementBtn.textContent = `📈 ${t.setFontIncrement}: ${fontIncrement}px`;
-        }
-
-        const fontFamilyBtn = document.getElementById('NiceFont_set-font-family-btn');
-        if (fontFamilyBtn) {
-            fontFamilyBtn.textContent = `🖋️ ${t.setFontFamily}: ${currentFontFamily}`;
-        }
-
-        const scopeBtn = document.getElementById('NiceFont_config-scope-btn');
-        if (scopeBtn) {
-            scopeBtn.textContent = `ℹ️ ${t.configScope}: ${getConfigScopeDisplayText()}`;
-        }
-
-        const currentConfigScopeBtn = document.getElementById('NiceFont_config-currentConfigScope-btn');
-        if (currentConfigScopeBtn) {
-            currentConfigScopeBtn.textContent = `📍 ${t.currentConfigScope}: ${getCurrentConfigScopeText()}`;
-        }
-    }
-
-    // 更新油猴脚本菜单
-    function updateMenuCommands() {
-        menuHandles.forEach(handle => {
-            try {
-                GM_unregisterMenuCommand(handle);
-            } catch (e) {
-                log('NiceFont: 取消注册菜单错误：', e);
-            }
-        });
-        menuHandles = [];
-        const t = translations[currentLanguage] || translations['en'];
-        const currentScope = getCurrentConfigScope();
-        const scopeText = currentScope === 1 ? t.subdomain : currentScope === 2 ? t.topLevelDomain : t.allWebsites;
-        log('NiceFont: 更新菜单命令');
-
-        // 定义所有命令，顺序与浮动面板一致（用于油猴菜单模式）
-        const commands = [
-            { id: 'status', text: `📏 ${t.fontSizeAdjustment}: ${currentAdjustment >= 0 ? '+' : ''}${currentAdjustment}px`, action: () => { } },
-            {
-                id: 'increase', text: `🔼 ${t.increase}`, action: () => {
-                    changeFontSize(fontIncrement);
-                    isConfigModified = true;
-                }, autoClose: false
-            },
-            {
-                id: 'decrease', text: `🔽 ${t.decrease}`, action: () => {
-                    changeFontSize(-fontIncrement);
-                    isConfigModified = true;
-                }, autoClose: false
-            },
-            {
-                id: 'reset', text: `🔁 ${t.reset}`, action: () => {
-                    resetFont(document.body);
-                    currentAdjustment = 0;
-                    currentFontFamily = 'none';
-                    watchDOMChanges = false;
-                    intervalSeconds = 0;
-                    firstAdjustment = false;
-                    firstAdjustmentTime = 3;
-                    if (observer) {
-                        observer.disconnect();
-                        observer = null;
-                    }
-                    if (timer) {
-                        clearInterval(timer);
-                        timer = null;
-                    }
-                    isConfigModified = true;
-                    updateMenuCommands();
-                    log('NiceFont: 恢复字体');
-                }
-            },
-            {
-                id: 'reapply', text: `♻️ ${t.reapply}`, action: () => {
-                    applyFontRecursively(document.body, currentAdjustment);
-                    log('NiceFont: 应用字体变化');
-                }, autoClose: false
-            },
-            {
-                id: 'setIncrement', text: `📈 ${t.setFontIncrement}: ${fontIncrement}px`, action: () => {
-                    const input = prompt(t.setFontIncrementPrompt, fontIncrement.toString());
-                    const newIncrement = parseInt(input, 10);
-                    if (!isNaN(newIncrement) && newIncrement > 0) {
-                        fontIncrement = newIncrement;
-                        isConfigModified = true;
-                        updateMenuCommands();
-                        log(`NiceFont: 字体增量设置为${newIncrement}px`);
-                    } else {
-                        alert(t.setFontIncrementErrorAlert);
-                    }
-                }
-            },
-            {
-                id: 'setFontFamily', text: `🖋️ ${t.setFontFamily}: ${currentFontFamily}`, action: () => {
-                    const input = prompt(`${t.setFontFamilyPrompt}\n\n${t.supportFontFamily}\n${supportFonts.slice(0, -1).join(", ")}`, currentFontFamily);
-                    if (input && input.trim() !== "") {
-                        const newFont = input.trim();
-                        if (!supportFonts.includes(newFont)) {
-                            supportFonts.splice(supportFonts.length - 1, 0, newFont);
-                        }
-                        currentFontFamily = newFont;
-                        // 通过 :root 设置字体类型
-                        if (currentFontFamily !== 'none') {
-                            document.documentElement.style.setProperty('--nicefont-family', currentFontFamily);
-                        } else {
-                            document.documentElement.style.removeProperty('--nicefont-family');
-                        }
-                        isConfigModified = true;
-                        updateMenuCommands();
-                        log(`NiceFont: 字体类型设置为 ${currentFontFamily}`);
-                    } else {
-                        alert(t.invalidFontFamilyAlert);
-                    }
-                }
-            },
-            {
-                id: 'toggleFirstAdjustment', text: `1️⃣ ${firstAdjustment ? t.firstAdjustmentEnabled : t.firstAdjustmentDisabled} ${firstAdjustment ? `【${firstAdjustmentTime}s】` : ''}`, action: () => {
-                    const input = prompt(t.firstAdjustmentConfirm, firstAdjustmentTime.toString());
-                    const secs = parseInt(input, 10);
-                    if (!isNaN(secs)) {
-                        firstAdjustment = !firstAdjustment;
-                        firstAdjustmentTime = secs;
-                        if (secs === 0) {
-                            firstAdjustment = false;
-                        }
-                        isConfigModified = true;
-                        updateMenuCommands();
-                        log(`NiceFont: 第一次调整字体已切换，时间设置为${secs}s`);
-                    }
-                }
-            },
-            {
-                id: 'toggleTimer', text: `⏱️ ${intervalSeconds > 0 ? t.timerAdjustmentEnabled : t.timerAdjustmentDisabled} ${intervalSeconds > 0 ? `【${intervalSeconds}s】` : ''}`, action: () => {
-                    const input = prompt(t.timerPrompt, intervalSeconds.toString());
-                    const secs = parseInt(input, 10);
-                    if (!isNaN(secs)) {
-                        intervalSeconds = secs;
-                        if (intervalSeconds > 0) {
-                            watchDOMChanges = false;
-                            if (observer) observer.disconnect();
-                            if (timer) clearInterval(timer);
-                            timer = setInterval(() => {
-                                applyFontRecursively(document.body, currentAdjustment);
-                            }, intervalSeconds * 1000);
-                            log(`NiceFont: 定时调整字体已切换，时间设置为${secs}s`);
-                        } else {
-                            if (timer) clearInterval(timer);
-                            log('NiceFont: 定时调整字体已禁用');
-                        }
-                        isConfigModified = true;
-                        updateMenuCommands();
-                    }
-                }
-            },
-            {
-                id: 'toggleWatch', text: `👁️ ${watchDOMChanges ? t.dynamicAdjustmentEnabled : t.dynamicAdjustmentDisabled}`, action: () => {
-                    if (confirm(t.dynamicWatchConfirm)) {
-                        watchDOMChanges = !watchDOMChanges;
-                        if (watchDOMChanges) {
-                            intervalSeconds = 0;
-                            if (timer) clearInterval(timer);
-                            observer = new MutationObserver(throttle(() => {
-                                applyFontRecursively(document.body, currentAdjustment);
-                            }, 100));
-                            observer.observe(document.body, { childList: true, subtree: true });
-                            log('NiceFont: 动态调整字体已启用');
-                        } else {
-                            if (observer) observer.disconnect();
-                            log('NiceFont: 动态调整字体已禁用');
-                        }
-                        isConfigModified = true;
-                        updateMenuCommands();
-                    }
-                }
-            },
-            {
-                id: 'switchLanguage', text: `🌐 ${t.usageLanguage}: ${currentLanguage}`, action: () => {
-                    let input;
-                    do {
-                        input = prompt(`zh: 汉语 \t en: English \t ko: 한국어 \t ja: 日本語 \t ru: Русский \t fr: Français \t de: Deutsch \t es: Español \t pt: Português`, currentLanguage);
-                        if (input && Object.keys(translations).indexOf(input.trim()) === -1) {
-                            alert('Invalid language code!');
-                        }
-                    } while (input && Object.keys(translations).indexOf(input.trim()) === -1);
-                    if (input && input.trim() !== "") {
-                        currentLanguage = input.trim();
-                        GM_setValue('language', currentLanguage);
-                        updateMenuCommands();
-                        log(`NiceFont: 语言切换为 ${currentLanguage}`);
-                    }
-                }
-            },
-            {
-                id: 'switchPanel', text: `🎨 ${t.switchPanel}: ${panelType === 'tampermonkey' ? t.tampermonkeyPanel : t.floatingPanel}`, action: () => {
-                    const newPanelType = panelType === 'tampermonkey' ? 'floating' : 'tampermonkey';
-                    GM_setValue(PANEL_TYPE_KEY, newPanelType);
-                    panelType = newPanelType;
-                    updateMenuCommands();
-                    const panel = document.getElementById('NiceFont_panel');
-                    const overlay = document.getElementById('NiceFont_overlay');
-                    if (panel) {
-                        panel.remove();
-                        log('NiceFont: 移除面板型开关上现有的面板');
-                    }
-                    if (overlay) {
-                        overlay.remove();
-                        log('NiceFont: 移除了面板开关上现有的覆盖层');
-                    }
-                    log(`NiceFont: 切换到面板类型：${newPanelType}`);
-                }
-            },
-            { id: 'currentConfigScope', text: `📍 ${t.currentConfigScope}: ${getCurrentConfigScopeText()}`, action: deleteCurrentConfig },
-            { id: 'configScope', text: `ℹ️ ${t.configScope}: ${scopeText}`, action: changeConfigScope },
-            { id: 'saveConfig', text: `💾 ${isConfigModified ? t.saveConfigPending : t.saveConfig}`, action: saveConfig },
-        ];
-
-        // 注册命令
-        if (panelType === 'floating') {
-            // 仅注册“切换菜单面板”和“显示面板”
-            const switchPanelHandle = GM_registerMenuCommand(
-                `🎨 ${t.switchPanel}: ${panelType === 'tampermonkey' ? t.tampermonkeyPanel : t.floatingPanel}`,
-                () => {
-                    const newPanelType = panelType === 'tampermonkey' ? 'floating' : 'tampermonkey';
-                    GM_setValue(PANEL_TYPE_KEY, newPanelType);
-                    panelType = newPanelType;
-                    updateMenuCommands();
-                    const panel = document.getElementById('NiceFont_panel');
-                    const overlay = document.getElementById('NiceFont_overlay');
-                    if (panel) {
-                        panel.remove();
-                        log('NiceFont: 移除面板型开关上现有的面板');
-                    }
-                    if (overlay) {
-                        overlay.remove();
-                        log('NiceFont: 移除了面板开关上现有的覆盖层');
-                    }
-                    log(`NiceFont: 切换到面板类型：${newPanelType}`);
-                }
-            );
-            menuHandles.push(switchPanelHandle);
-            log('NiceFont: 注册切换面板菜单');
-
-            const showPanelHandle = GM_registerMenuCommand(`📅 ${t.showPanel}`, () => {
-                const panel = document.getElementById('NiceFont_panel');
-                const overlay = document.getElementById('NiceFont_overlay');
-                if (panel) {
-                    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-                    overlay.style.display = panel.style.display === 'none' ? 'none' : 'block';
-                    log(`NiceFont: 切换面板为 ${panel.style.display}, 屏蔽层设为 ${overlay.style.display}`);
-                } else {
-                    createFloatingPanel();
-                }
-            });
-            menuHandles.push(showPanelHandle);
-            log('NiceFont: 注册显示面板菜单');
-        } else {
-            // 油猴菜单模式：注册所有命令（不包括“显示面板”）
-            commands.forEach(cmd => {
-                const handle = GM_registerMenuCommand(cmd.text, cmd.action, { autoClose: cmd.autoClose });
-                menuHandles.push(handle);
-                log(`NiceFont: 注册菜单：${cmd.id}`);
-            });
-        }
-    }
-
-    // 检查是否有可见文本
-    function hasVisibleText(el) {
-        return Array.from(el.childNodes).some(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim() !== "");
-    }
-
-    // 批量更新字体
-    function applyFontRecursively(el, increment) {
-        if (el.nodeType !== Node.ELEMENT_NODE) return;
-        if (el.id === 'NiceFont_panel' || el.hasAttribute('data-nicefont-panel')) {
-            log('NiceFont: 跳过对面板的字体调整');
-            return;
-        }
-
-        const style = window.getComputedStyle(el);
-        const isVisible = style.display !== "none" && style.visibility !== "hidden";
-
-        if (hasVisibleText(el) && isVisible) {
-            let currentFontSize = el.style.fontSize || style.fontSize;
-
-            if (!el.hasAttribute('data-default-fontsize')) {
-                el.setAttribute('data-default-fontsize', currentFontSize); // 存储默认字体大小
-            }
-
-            const baseFontSize = parseFloat(convertToPx(el, el.getAttribute('data-default-fontsize')));
-
-            if (!isNaN(baseFontSize)) {
-                const newFontSize = baseFontSize + increment;
-                el.style.fontSize = `${newFontSize}px`; // 设置字体大小
-            }
-        }
-
-        // 通过 :root 设置字体类型
-        if (currentFontFamily !== 'none') {
-            document.documentElement.style.setProperty('--nicefont-family', currentFontFamily);
-        } else {
-            document.documentElement.style.removeProperty('--nicefont-family');
-        }
-
-        // 处理 iframe
-        if (el.tagName === 'IFRAME') {
-            try {
-                const iframeDocument = el.contentDocument || el.contentWindow.document;
-                if (iframeDocument) {
-                    applyFontRecursively(iframeDocument.body, increment);
-                    // 为 iframe 的 :root 设置字体类型
-                    if (currentFontFamily !== 'none') {
-                        iframeDocument.documentElement.style.setProperty('--nicefont-family', currentFontFamily);
-                    } else {
-                        iframeDocument.documentElement.style.removeProperty('--nicefont-family');
-                    }
-                }
-            } catch (e) {
-                log('NiceFont: 访问 iframe 时出错:', e);
-            }
-        }
-
-        // 处理 Shadow DOM
-        if (el.shadowRoot) {
-            const shadowChildren = el.shadowRoot.querySelectorAll('*');
-            shadowChildren.forEach(child => applyFontRecursively(child, increment));
-        }
-
-        // 递归处理子元素
-        Array.from(el.children).forEach(child => {
-            requestAnimationFrame(() => applyFontRecursively(child, increment));
-        });
-    }
-
-    // 重置字体
-    function resetFont(el) {
-        if (el.nodeType !== Node.ELEMENT_NODE) return;
-        if (el.id === 'NiceFont_panel' || el.hasAttribute('data-nicefont-panel')) {
-            log('NiceFont: 跳过对面板的字体重置');
-            return;
-        }
-
-        // 恢复字体大小
-        const defaultSize = el.getAttribute('data-default-fontsize');
-        if (defaultSize) {
-            el.style.fontSize = defaultSize; // 恢复到原始字体大小
-            el.removeAttribute('data-default-fontsize'); // 清理属性
-        } else {
-            el.style.removeProperty('font-size'); // 移除内联字体大小
-        }
-
-        // 移除内联字体类型
-        el.style.removeProperty('font-family');
-
-        // 通过 :root 重置字体类型
-        try {
-            document.documentElement.style.removeProperty('--nicefont-family');
-        } catch (e) {
-            log('NiceFont: 移除 --nicefont-family 失败:', e);
-        }
-
-        // 处理 Shadow DOM
-        if (el.shadowRoot) {
-            try {
-                const shadowChildren = el.shadowRoot.querySelectorAll('*');
-                shadowChildren.forEach(child => resetFont(child));
-                // 重置 Shadow DOM 的 :root
-                const shadowRoot = el.shadowRoot;
-                if (shadowRoot.adoptedStyleSheets && shadowRoot.adoptedStyleSheets.length > 0) {
-                    log('NiceFont: Shadow DOM 包含样式表，跳过重置');
-                } else {
-                    const style = shadowRoot.querySelector('style');
-                    if (style) {
-                        style.textContent = style.textContent.replace(/--nicefont-family:[^;]+;/g, '');
-                    }
-                }
-            } catch (e) {
-                log('NiceFont: 处理 Shadow DOM 失败:', e);
-            }
-        }
-
-        // 处理 iframe
-        if (el.tagName === 'IFRAME') {
-            try {
-                const iframeDocument = el.contentDocument || el.contentWindow.document;
-                if (iframeDocument) {
-                    resetFont(iframeDocument.body);
-                    // 重置 iframe 的 :root
-                    iframeDocument.documentElement.style.removeProperty('--nicefont-family');
-                }
-            } catch (e) {
-                log('NiceFont: 访问 iframe 时出错，重置字体失败:', e);
-            }
-        }
-
-        // 递归重置子元素
-        try {
-            Array.from(el.children).forEach(child => resetFont(child));
-        } catch (e) {
-            log('NiceFont: 递归重置子元素失败:', e);
-        }
-    }
-
-    // 转换字体单位
-    function convertToPx(el, fontSize) {
-        if (!fontSize) return 16;
-        if (fontSize.includes("rem")) {
-            const rootFontSize = parseFloat(window.getComputedStyle(document.documentElement).fontSize);
-            return parseFloat(fontSize) * rootFontSize;
-        }
-        if (fontSize.includes("em")) {
-            const parentFontSize = parseFloat(window.getComputedStyle(el.parentElement).fontSize);
-            return parseFloat(fontSize) * parentFontSize;
-        }
-        if (fontSize.includes("%")) {
-            const parentFontSize = parseFloat(window.getComputedStyle(el.parentElement).fontSize);
-            return (parseFloat(fontSize) / 100) * parentFontSize;
-        }
-        if (fontSize.includes("pt")) {
-            return parseFloat(fontSize) * 1.3333;
-        }
-        if (fontSize.includes("vw")) {
-            return parseFloat(fontSize) * window.innerWidth / 100;
-        }
-        if (fontSize.includes("vh")) {
-            return parseFloat(fontSize) * window.innerHeight / 100;
-        }
-        return parseFloat(fontSize);
-    }
-
-    // 初始化
-    log('NiceFont: 正在初始化菜单');
-    updateMenuCommands();
-
-    if (currentAdjustment !== 0 || currentFontFamily !== 'none') {
-        if (firstAdjustment && firstAdjustmentTime > 0) {
-            setTimeout(() => {
-                applyFontRecursively(document.body, currentAdjustment);
-                log('NiceFont: 应用第一次字体调整');
-            }, firstAdjustmentTime * 1000);
-        }
-
-        if (watchDOMChanges) {
-            if (timer) clearInterval(timer);
-            observer = new MutationObserver(throttle(() => {
-                applyFontRecursively(document.body, currentAdjustment);
-            }, 100));
-            observer.observe(document.body, { childList: true, subtree: true });
-            log('NiceFont: 启用动态字体调整');
-        } else if (intervalSeconds > 0) {
-            if (observer) observer.disconnect();
-            timer = setInterval(() => {
-                applyFontRecursively(document.body, currentAdjustment);
-            }, intervalSeconds * 1000);
-            log(`NiceFont: 使用${intervalSeconds}s间隔启用基于定时器的字体调整`);
-        }
-    }
-
-    log('NiceFont: 脚本初始化完成');
+    init();
 })();
