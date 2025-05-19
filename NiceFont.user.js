@@ -10,23 +10,25 @@
 // @name:de       NiceFont (Schöne Schrift)
 // @name:es       NiceFont (Fuente agradable)
 // @name:pt       NiceFont (Fonte agradável)
+// @version      3.1
+// @author       DD1024z
+// @description  NiceFont: 是一款优化网页字体显示的强大工具，让浏览更清晰、舒适！“真正调整字体，而非页面缩放，拒绝将就”！可直接修改网页的字体大小与风格，保存你的字体设置，轻松应用到每个网页，支持首次、定时或动态调整字体，适配子域名、整站或全局设置，兼容B站评论区、钉钉文档、知乎、论坛等几乎所有网站！
+// @description:zh-CN  NiceFont: 是一款优化网页字体显示的强大工具，让浏览更清晰、舒适！“真正调整字体，而非页面缩放，拒绝将就”！可直接修改网页的字体大小与风格，保存你的字体设置，轻松应用到每个网页，支持首次、定时或动态调整字体，适配子域名、整站或全局设置，兼容B站评论区、钉钉文档、知乎、论坛等几乎所有网站！
+// @description:zh-TW  NiceFont：是一款優化網頁字體顯示的強大工具，讓瀏覽更清晰、舒適！「真正調整字體，而非頁面縮放，拒絕將就」！可直接修改網頁的字體大小與風格，儲存你的字體設定，輕鬆應用到每個網頁，支援首次、定時或動態調整字體，適配子域名、整站或全局設定，相容B站評論區、釘釘文件、知乎、論壇等幾乎所有網站！
+// @description:en     NiceFont: A powerful tool to optimize web font display for clearer, more comfortable browsing! "Truly adjusts fonts, not page scaling—settle for nothing less!" Directly modifies font size and style, saves your settings, and applies them effortlessly to every page. Supports one-time, scheduled, or dynamic font adjustments, adaptable to subdomains, entire sites, or global settings. Compatible with nearly all websites, including Bilibili comments, DingTalk docs, Zhihu, forums, and more!
+// @description:ko     NiceFont: 웹 폰트 표시를 최적화하여 더 선명하고 편안한 브라우징을 제공하는 강력한 도구! "페이지를 스케일링하지 않고 진정으로 폰트를 조정—타협하지 마세요!" 폰트 크기와 스타일을 직접 수정하고, 설정을 저장하여 모든 페이지에 쉽게 적용합니다. 최초, 정기 또는 동적 폰트 조정을 지원하며, 서브도메인, 전체 사이트 또는 전역 설정에 적응 가능. Bilibili 댓글, DingTalk 문서, Zhihu, 포럼 등 거의 모든 웹사이트와 호환!
+// @description:ja     NiceFont：ウェブフォント表示を最適化し、よりクリアで快適な閲覧を実現する強力なツール！「ページのスケーリングではなく、フォントを本当の意味で調整—妥協はなし！」フォントサイズとスタイルを直接変更し、設定を保存してすべてのページに簡単に適用。初回、定期、または動的フォント調整をサポートし、サブドメイン、サイト全体、またはグローバル設定に適応可能。ビリビリコメント、DingTalkドキュメント、Zhihu、フォーラムなど、ほぼすべてのウェブサイトに対応！
+// @description:ru     NiceFont: Мощный инструмент для оптимизации отображения веб-шрифтов, обеспечивающий более четкое и комфортное чтение! "По-настоящему регулирует шрифты, а не масштабирует страницу — никаких компромиссов!" Позволяет напрямую изменять размер и стиль шрифта, сохранять настройки и легко применять их к каждой странице. Поддерживает разовую, запланированную или динамическую настройку шрифтов, адаптируется к поддоменам, целым сайтам или глобальным настройкам. Совместим с большинством сайтов, включая комментарии на Bilibili, документы DingTalk, Zhihu, форумы и другие!
+// @description:fr     NiceFont : Un outil puissant pour optimiser l'affichage des polices web, rendant la navigation plus claire et confortable ! « Ajuste réellement les polices, pas un simple zoom de page — refusez les compromis ! » Modifie directement la taille et le style des polices, enregistre vos paramètres et les applique facilement à chaque page. Prend en charge les ajustements uniques, programmés ou dynamiques des polices, adaptable aux sous-domaines, sites entiers ou paramètres globaux. Compatible avec presque tous les sites, y compris les commentaires de Bilibili, les documents DingTalk, Zhihu, les forums, et plus encore !
+// @description:de     NiceFont: Ein leistungsstarkes Tool zur Optimierung der Webschriftanzeige für klareres und angenehmeres Surfen! "Passt Schriften wirklich an, statt die Seite zu skalieren — keine Kompromisse!" Ändert Schriftgröße und -stil direkt, speichert Ihre Einstellungen und wendet sie mühelos auf jede Seite an. Unterstützt einmalige, geplante oder dynamische Schrifteinstellungen, anpassbar an Subdomains, ganze Websites oder globale Einstellungen. Kompatibel mit fast allen Websites, einschließlich Bilibili-Kommentaren, DingTalk-Dokumenten, Zhihu, Foren und mehr!
+// @description:es     NiceFont: ¡Una poderosa herramienta para optimizar la visualización de fuentes web, haciendo que la navegación sea más clara y cómoda! "Ajusta realmente las fuentes, no solo escala la página — ¡sin concesiones!" Modifica directamente el tamaño y estilo de la fuente, guarda tus configuraciones y las aplica fácilmente a cada página. Admite ajustes únicos, programados o dinámicos de fuentes, adaptable a subdominios, sitios completos o configuraciones globales. Compatible con casi todos los sitios web, incluidos comentarios de Bilibili, documentos de DingTalk, Zhihu, foros y más!
+// @description:pt     NiceFont: Uma ferramenta poderosa para otimizar a exibição de fontes na web, tornando a navegação mais clara e confortável! "Ajusta realmente as fontes, não apenas escala a página — sem concessões!" Modifica diretamente o tamanho e estilo da fonte, salva suas configurações e as aplica facilmente a cada página. Suporta ajustes únicos, agendados ou dinâmicos de fontes, adaptável a subdomínios, sites inteiros ou configurações globais. Compatível com quase todos os sites, incluindo comentários do Bilibili, documentos do DingTalk, Zhihu, fóruns e mais!
 // @homepageURL   https://github.com/10D24D/NiceFont/
 // @namespace    https://github.com/10D24D/NiceFont/
-// @version      3.0
-// @description  NiceFont: 修改页面字体的工具，“真正调整字体，而非页面缩放，拒绝将就！”。让字体更清晰、舒适！支持动态、定时调整字体大小和类型，记住你的设置，轻松优化每个网页的字体显示！
-// @description:en NiceFont is a tool for modifying webpage fonts. "Adjust the font itself, not the page zoom. No compromises!" It makes fonts clearer and more comfortable! Supports dynamic and timed adjustments for font size and type, remembers your settings, and optimizes font display on every webpage!
-// @description:zh-CN NiceFont: 修改页面字体的工具，“真正调整字体，而非页面缩放，拒绝将就！”。让字体更清晰、舒适！支持动态、定时调整字体大小和类型，记住你的设置，轻松优化每个网页的字体显示！
-// @description:zh-TW NiceFont: 修改頁面字體的工具，“真正調整字體，而非頁面縮放，拒絕將就！”。讓字體更清晰、舒適！支持動態、定時調整字體大小和類型，記住你的設置，輕鬆優化每個網頁的字體顯示！
-// @description:ko NiceFont: 페이지 글꼴을 수정하는 도구, "글꼴을 실제로 조정하고 페이지 확대/축소를 하지 않습니다. 타협하지 마세요!" 글꼴을 더 선명하고 편안하게 만듭니다! 동적 및 시간 기반 글꼴 크기와 유형 조정 지원, 설정을 기억하고 모든 웹페이지의 글꼴 표시를 쉽게 최적화합니다!
-// @description:ja NiceFont: ページのフォントを変更するツール、「ページのズームではなくフォントを調整します。妥協しません！」フォントをよりクリアで快適に！動的およびタイマーでフォントのサイズとタイプを調整でき、設定を記憶して、各ウェブページのフォント表示を簡単に最適化します！
-// @description:ru NiceFont — инструмент для изменения шрифтов на веб-страницах. "Настройте шрифт, а не масштаб страницы. Без компромиссов!" Делает шрифты более четкими и удобными! Поддерживает динамическую и по времени настройку размера и типа шрифта, запоминает ваши настройки и легко оптимизирует отображение шрифтов на каждой веб-странице!
-// @description:fr NiceFont est un outil de modification des polices de pages web. "Ajustez la police elle-même, pas le zoom de la page. Pas de compromis!" Il rend les polices plus claires et confortables! Prend en charge les ajustements dynamiques et programmés de la taille et du type de police, se souvient de vos paramètres et optimise facilement l'affichage des polices sur chaque page web!
-// @description:de NiceFont ist ein Tool zur Änderung der Schriftarten auf Webseiten. "Stellen Sie die Schriftart selbst ein, nicht den Seitenzoom. Keine Kompromisse!" Es macht die Schriftarten klarer und komfortabler! Unterstützt dynamische und zeitgesteuerte Anpassungen der Schriftgröße und des Schriftstils, merkt sich Ihre Einstellungen und optimiert die Schriftanzeige auf jeder Webseite problemlos!
-// @description:es NiceFont es una herramienta para modificar las fuentes de las páginas web. "Ajusta la fuente en sí, no el zoom de la página. ¡Sin compromisos!" ¡Hace que las fuentes sean más claras y cómodas! Soporta ajustes dinámicos y programados del tamaño y tipo de fuente, recuerda tus configuraciones y optimiza fácilmente la visualización de fuentes en cada página web!
-// @description:pt NiceFont é uma ferramenta para modificar as fontes das páginas da web. "Ajuste a fonte em si, não o zoom da página. Sem compromissos!" Torna as fontes mais claras e confortáveis! Suporta ajustes dinâmicos e temporizados do tamanho e tipo de fonte, lembra suas configurações e otimiza facilmente a exibição das fontes em cada página da web!
-// @author       DD1024z
-// @match        *://*/*
 // @icon         https://raw.githubusercontent.com/10D24D/NiceFont/main/static/logo.png
+// @downloadURL  https://update.greasyfork.org/scripts/533232/NiceFont.user.js
+// @updateURL    https://update.greasyfork.org/scripts/533232/NiceFont.meta.js
+// @match        *://*/*
 // @license      Apache License 2.0
 // @grant        GM_registerMenuCommand
 // @grant        GM_unregisterMenuCommand
@@ -35,8 +37,13 @@
 // @grant        GM_addStyle
 // @grant        GM_info
 // @run-at       document-start
-// @downloadURL  https://update.greasyfork.org/scripts/533232/NiceFont.user.js
-// @updateURL    https://update.greasyfork.org/scripts/533232/NiceFont.meta.js
+// @compatible   edge version≥90 (Compatible Tampermonkey, Violentmonkey)
+// @compatible   Chrome version≥90 (Compatible Tampermonkey, Violentmonkey)
+// @compatible   Firefox version≥84 (Compatible Greasemonkey, Tampermonkey, Violentmonkey)
+// @compatible   Opera version≥78 (Compatible Tampermonkey, Violentmonkey)
+// @compatible   Safari version≥15.4 (Compatible Tampermonkey, Userscripts)
+// @create       2025-4-18
+// @copyright    2025, DD1024z
 // ==/UserScript==
 
 (function () {
