@@ -75,9 +75,9 @@
 
 ### 🎨 UI Preview
 
-<img alt="UI" src="https://raw.githubusercontent.com/10D24D/NiceFont/refs/heads/main/static/ui_1_zh.png"></img>
+<img alt="UI" src="https://raw.githubusercontent.com/10D24D/NiceFont/refs/heads/main/static/ui_1_en.png"></img>
 
-<img alt="UI" src="https://raw.githubusercontent.com/10D24D/NiceFont/refs/heads/main/static/ui_2_zh.png"></img>
+<img alt="UI" src="https://raw.githubusercontent.com/10D24D/NiceFont/refs/heads/main/static/ui_2_en.png"></img>
 
 ### 📑 Main Features
 
