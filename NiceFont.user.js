@@ -10,10 +10,9 @@
 // @name:de       NiceFont (Schöne Schrift)
 // @name:es       NiceFont (Fuente agradable)
 // @name:pt       NiceFont (Fonte agradável)
-// @version      3.1
+// @version      3.2
 // @author       DD1024z
-// @description  NiceFont: 是一款优化网页字体显示的强大工具，让浏览更清晰、舒适！“真正调整字体，而非页面缩放，拒绝将就”！可直接修改网页的字体大小与风格，保存你的字体设置，轻松应用到每个网页，支持首次、定时或动态调整字体，适配子域名、整站或全局设置，兼容B站评论区、钉钉文档、知乎、论坛等几乎所有网站！
-// @description:zh-CN  NiceFont: 是一款优化网页字体显示的强大工具，让浏览更清晰、舒适！“真正调整字体，而非页面缩放，拒绝将就”！可直接修改网页的字体大小与风格，保存你的字体设置，轻松应用到每个网页，支持首次、定时或动态调整字体，适配子域名、整站或全局设置，兼容B站评论区、钉钉文档、知乎、论坛等几乎所有网站！
+// @description  NiceFont: 是一款优化网页字体显示的工具，让浏览更清晰、舒适！“真正调整字体，而非页面缩放，拒绝将就”！可直接修改网页的字体大小与风格，保存你的字体设置，轻松应用到每个网页，支持首次、定时或动态调整字体，适配子域名、整站或全局设置，兼容B站评论区、钉钉文档、知乎、论坛等几乎所有网站！
 // @description:zh-TW  NiceFont：是一款優化網頁字體顯示的強大工具，讓瀏覽更清晰、舒適！「真正調整字體，而非頁面縮放，拒絕將就」！可直接修改網頁的字體大小與風格，儲存你的字體設定，輕鬆應用到每個網頁，支援首次、定時或動態調整字體，適配子域名、整站或全局設定，相容B站評論區、釘釘文件、知乎、論壇等幾乎所有網站！
 // @description:en     NiceFont: A powerful tool to optimize web font display for clearer, more comfortable browsing! "Truly adjusts fonts, not page scaling—settle for nothing less!" Directly modifies font size and style, saves your settings, and applies them effortlessly to every page. Supports one-time, scheduled, or dynamic font adjustments, adaptable to subdomains, entire sites, or global settings. Compatible with nearly all websites, including Bilibili comments, DingTalk docs, Zhihu, forums, and more!
 // @description:ko     NiceFont: 웹 폰트 표시를 최적화하여 더 선명하고 편안한 브라우징을 제공하는 강력한 도구! "페이지를 스케일링하지 않고 진정으로 폰트를 조정—타협하지 마세요!" 폰트 크기와 스타일을 직접 수정하고, 설정을 저장하여 모든 페이지에 쉽게 적용합니다. 최초, 정기 또는 동적 폰트 조정을 지원하며, 서브도메인, 전체 사이트 또는 전역 설정에 적응 가능. Bilibili 댓글, DingTalk 문서, Zhihu, 포럼 등 거의 모든 웹사이트와 호환!
@@ -50,7 +49,7 @@
     'use strict';
 
     // 调试开关，生产环境中禁用日志
-    const enableLogging = true;
+    const enableLogging = false;
 
     // 关闭跟踪常量
     const CLOSE_TRACKING_WINDOW = 1800 * 1000; // 30 分钟（毫秒）
@@ -458,7 +457,7 @@
     // --- 字体管理 ---
     const FontManager = {
         supportFonts: [
-            'custom', 'auto', 'Arial', 'cursive', 'fangsong', 'fantasy', 'monospace', 'none',
+            'custom', 'auto', 'none', 'Arial', 'cursive', 'fangsong', 'fantasy', 'monospace',
             'sans-serif', 'serif', 'system-ui', 'ui-monospace', 'ui-rounded', 'ui-sans-serif',
             'ui-serif', '-webkit-body', 'inherit', 'initial', 'unset', 'Verdana', 'Helvetica',
             'Tahoma', 'Times New Roman', 'Georgia', 'Courier New', 'Comic Sans MS'
@@ -490,14 +489,14 @@
             if (el.tagName === 'IFRAME') {
                 try {
                     const iframeDoc = el.contentDocument || el.contentWindow.document;
-                    if (iframeDoc) {
-                        this.traverseDOM(iframeDoc.body, callback);
+                    if (iframeDoc && iframeDoc.body) {
                         const font = State.get('currentFontFamily');
                         if (font !== 'none') {
-                            iframeDoc.documentElement.style.setProperty('--nicefont-family', font);
+                            iframeDoc.documentElement.style.fontFamily = font;
                         } else {
-                            iframeDoc.documentElement.style.removeProperty('--nicefont-family');
+                            iframeDoc.documentElement.style.removeProperty('font-family');
                         }
+                        this.traverseDOM(iframeDoc.body, callback);
                     }
                 } catch (e) {
                     console.error('[NiceFont] 访问 iframe 失败:', e);
@@ -519,6 +518,7 @@
          * @param {number} increment - 字体大小增量（px）
          */
         applyFontRecursively(el, increment) {
+            const font = State.get('currentFontFamily');
             this.traverseDOM(el, (node) => {
                 const style = this.getCachedStyle(node);
                 const isVisible = style.display !== 'none' && style.visibility !== 'hidden';
@@ -531,14 +531,13 @@
                     if (!isNaN(baseFontSize)) {
                         node.style.fontSize = `${baseFontSize + increment}px`;
                     }
+                    if (font !== 'none') {
+                        node.style.fontFamily = font; // 修复：fontFfamily -> fontFamily
+                    } else {
+                        node.style.removeProperty('font-family');
+                    }
                 }
             });
-            const font = State.get('currentFontFamily');
-            if (font !== 'none') {
-                document.documentElement.style.setProperty('--nicefont-family', font);
-            } else {
-                document.documentElement.style.removeProperty('--nicefont-family');
-            }
         },
 
         /**
@@ -556,11 +555,6 @@
                 }
                 node.style.removeProperty('font-family');
             });
-            try {
-                document.documentElement.style.removeProperty('--nicefont-family');
-            } catch (e) {
-                console.error('[NiceFont] 移除 --nicefont-family 失败:', e);
-            }
             // 重置关闭跟踪状态
             GM_setValue('NiceFont_closeCount', 0);
             GM_setValue('NiceFont_lastCloseTime', 0);
@@ -600,62 +594,81 @@
                     getText: () => `🔠 ${t.setFontFamily}: ${State.get('currentFontFamily')}`,
                     action: () => {
                         const t = translations[State.get('currentLanguage')] || translations.en;
-                        let select = document.getElementById('NiceFont_font-family');
-                        if (select) {
-                            select.remove();
-                            document.removeEventListener('click', this.closeDropdown);
-                            return;
-                        }
-                        select = document.createElement('select');
-                        select.id = 'NiceFont_font-family';
-                        select.className = 'font-family-select';
-                        select.innerHTML = FontManager.supportFonts.map(font =>
-                            `<option value="${font}" ${font === State.get('currentFontFamily') ? 'selected' : ''}>${font === 'custom' ? (State.get('currentLanguage') === 'zh' ? '手动输入' : 'Custom Input') : font}</option>`
-                        ).join('');
-                        const btn = document.getElementById('NiceFont_setFontFamily');
-                        if (btn) btn.appendChild(select);
-                        select.focus();
-                        select.addEventListener('click', e => e.stopPropagation());
-                        select.addEventListener('change', (e) => {
-                            const selectedFont = e.target.value;
-                            if (selectedFont === 'custom') {
-                                const input = prompt(`${t.setFontFamilyPrompt}\n\n${t.supportFontFamily}\n${FontManager.supportFonts.slice(0, -1).join(', ')}`, '');
-                                if (input && input.trim()) {
-                                    const newFont = input.trim();
-                                    if (!FontManager.supportFonts.includes(newFont)) {
-                                        FontManager.supportFonts.splice(FontManager.supportFonts.length - 1, 0, newFont);
-                                        const option = document.createElement('option');
-                                        option.value = newFont;
-                                        option.textContent = newFont;
-                                        select.insertBefore(option, select.lastChild);
-                                    }
-                                    State.set('currentFontFamily', newFont);
-                                    select.value = newFont;
-                                } else {
-                                    select.value = State.get('currentFontFamily');
-                                    select.remove();
-                                    document.removeEventListener('click', this.closeDropdown);
-                                    log('取消自定义字体输入');
-                                    return;
+                        if (State.get('panelType') === 'tampermonkey') {
+                            // 油猴菜单模式下直接弹出提示框
+                            const input = prompt(`${t.setFontFamilyPrompt}\n\n${t.supportFontFamily}\n${FontManager.supportFonts.join(', ')}`, State.get('currentFontFamily') === 'none' ? '' : State.get('currentFontFamily'));
+                            if (input && input.trim()) {
+                                const newFont = input.trim();
+                                if (!FontManager.supportFonts.includes(newFont)) {
+                                    FontManager.supportFonts.splice(FontManager.supportFonts.length - 1, 0, newFont);
                                 }
+                                State.set('currentFontFamily', newFont);
+                                FontManager.applyFontRecursively(document.body, State.get('currentAdjustment'));
+                                State.set('isConfigModified', true);
+                                UIManager.updateUI();
+                                log(`字体类型设置为: ${newFont}`);
                             } else {
-                                State.set('currentFontFamily', selectedFont);
+                                log('取消字体输入');
                             }
-                            FontManager.applyFontRecursively(document.body, State.get('currentAdjustment'));
-                            State.set('isConfigModified', true);
-                            UIManager.updateUI();
-                            select.remove();
-                            document.removeEventListener('click', this.closeDropdown);
-                            log(`字体类型设置为: ${State.get('currentFontFamily')}`);
-                        });
-                        this.closeDropdown = (event) => {
-                            if (!select.contains(event.target) && !btn.contains(event.target)) {
+                        } else {
+                            // 浮动面板模式保持原有逻辑
+                            let select = document.getElementById('NiceFont_font-family');
+                            if (select) {
                                 select.remove();
                                 document.removeEventListener('click', this.closeDropdown);
-                                log('下拉菜单关闭');
+                                return;
                             }
-                        };
-                        document.addEventListener('click', this.closeDropdown);
+                            select = document.createElement('select');
+                            select.id = 'NiceFont_font-family';
+                            select.className = 'font-family-select';
+                            select.innerHTML = FontManager.supportFonts.map(font =>
+                                `<option value="${font}" ${font === State.get('currentFontFamily') ? 'selected' : ''}>${font === 'custom' ? (State.get('currentLanguage') === 'zh' ? '手动输入' : 'Custom Input') : font}</option>`
+                            ).join('');
+                            const btn = document.getElementById('NiceFont_setFontFamily');
+                            if (btn) btn.appendChild(select);
+                            select.focus();
+                            select.addEventListener('click', e => e.stopPropagation());
+                            select.addEventListener('change', (e) => {
+                                const selectedFont = e.target.value;
+                                if (selectedFont === 'custom') {
+                                    const input = prompt(`${t.setFontFamilyPrompt}\n\n${t.supportFontFamily}\n${FontManager.supportFonts.slice(0, -1).join(', ')}`, '');
+                                    if (input && input.trim()) {
+                                        const newFont = input.trim();
+                                        if (!FontManager.supportFonts.includes(newFont)) {
+                                            FontManager.supportFonts.splice(FontManager.supportFonts.length - 1, 0, newFont);
+                                            const option = document.createElement('option');
+                                            option.value = newFont;
+                                            option.textContent = newFont;
+                                            select.insertBefore(option, select.lastChild);
+                                        }
+                                        State.set('currentFontFamily', newFont);
+                                        select.value = newFont;
+                                    } else {
+                                        select.value = State.get('currentFontFamily');
+                                        select.remove();
+                                        document.removeEventListener('click', this.closeDropdown);
+                                        log('取消自定义字体输入');
+                                        return;
+                                    }
+                                } else {
+                                    State.set('currentFontFamily', selectedFont);
+                                }
+                                FontManager.applyFontRecursively(document.body, State.get('currentAdjustment'));
+                                State.set('isConfigModified', true);
+                                UIManager.updateUI();
+                                select.remove();
+                                document.removeEventListener('click', this.closeDropdown);
+                                log(`字体类型设置为: ${State.get('currentFontFamily')}`);
+                            });
+                            this.closeDropdown = (event) => {
+                                if (!select.contains(event.target) && !btn.contains(event.target)) {
+                                    select.remove();
+                                    document.removeEventListener('click', this.closeDropdown);
+                                    log('下拉菜单关闭');
+                                }
+                            };
+                            document.addEventListener('click', this.closeDropdown);
+                        }
                     }
                 },
                 {
@@ -790,15 +803,34 @@
                             }
                         } while (input && !Object.keys(translations).includes(input.trim()));
                         if (input && input.trim()) {
-                            State.set('currentLanguage', input.trim());
-                            GM_setValue('language', State.get('currentLanguage'));
-                            UIManager.updateUI();
-                            if (this.panelCache) {
-                                this.panelCache.remove();
-                                this.overlayCache.remove();
-                                this.createFloatingPanel();
+                            const newLanguage = input.trim();
+                            State.set('currentLanguage', newLanguage);
+                            GM_setValue('language', newLanguage);
+                            log(`语言切换为: ${newLanguage}`);
+
+                            // 更新现有面板内容，而不是销毁
+                            if (UIManager.panelCache && document.body.contains(UIManager.panelCache)) {
+                                UIManager.updatePanelContent();
+                                // 根据配置决定是否立即显示面板
+                                const autoShow = GM_getValue('NiceFont_autoShowAfterLanguageSwitch', true);
+                                if (autoShow) {
+                                    UIManager.panelCache.style.display = 'block';
+                                    UIManager.overlayCache.style.display = 'block';
+                                    log('语言切换后自动显示面板');
+                                }
+                            } else {
+                                // 如果面板不存在，创建并根据配置显示
+                                UIManager.createFloatingPanel();
+                                if (UIManager.panelCache) {
+                                    const autoShow = GM_getValue('NiceFont_autoShowAfterLanguageSwitch', true);
+                                    UIManager.panelCache.style.display = autoShow ? 'block' : 'none';
+                                    UIManager.overlayCache.style.display = autoShow ? 'block' : 'none';
+                                    log(`面板创建后，显示状态: ${autoShow ? 'block' : 'none'}`);
+                                } else {
+                                    console.error('[NiceFont] 语言切换后创建面板失败');
+                                }
                             }
-                            log(`语言切换为: ${State.get('currentLanguage')}`);
+                            UIManager.updateUI();
                         }
                     }
                 },
@@ -814,6 +846,16 @@
                             this.overlayCache.remove();
                             this.panelCache = null;
                             this.overlayCache = null;
+                            log('移除现有浮动面板');
+                        }
+                        if (newPanelType === 'floating') {
+                            // 直接创建并显示浮动面板，不检查配置源
+                            this.createFloatingPanel();
+                            if (this.panelCache) {
+                                this.panelCache.style.display = 'block';
+                                this.overlayCache.style.display = 'block';
+                                log('直接创建并显示浮动面板（切换到网页菜单模式）');
+                            }
                         }
                         UIManager.updateUI();
                         log(`切换到面板类型: ${newPanelType}`);
@@ -847,12 +889,27 @@
          * 创建浮动面板
          */
         createFloatingPanel() {
-            if (this.panelCache) {
-                log('panelCache 已存在，跳过创建');
+            if (this.panelCache && document.body.contains(this.panelCache)) {
+                log('panelCache 已存在且在 DOM 中，跳过创建');
                 return;
             }
+            // 清理现有面板
+            if (this.panelCache) {
+                this.panelCache.remove();
+                this.overlayCache.remove();
+                this.panelCache = null;
+                this.overlayCache = null;
+                log('清理现有 panelCache');
+            }
+
             const t = translations[State.get('currentLanguage')] || translations.en;
             const scriptName = GM_info?.script?.name || 'NiceFont';
+
+            // 确保 DOM 已就绪
+            if (!document.body) {
+                console.error('[NiceFont] document.body 不可用，延迟创建面板');
+                return;
+            }
 
             // 初始化面板
             this.panelCache = document.createElement('div');
@@ -869,6 +926,7 @@
             this.panelCache.style.fontFamily = 'sans-serif';
             this.panelCache.style.fontSize = '15px';
             this.panelCache.style.userSelect = 'none';
+            this.panelCache.style.display = 'none'; // 默认隐藏
 
             // 初始化遮罩层
             this.overlayCache = document.createElement('div');
@@ -883,28 +941,25 @@
 
             // 设置面板内容
             this.panelCache.innerHTML = `
-                <div class="NiceFont_header" style="position: relative; z-index: 10002; display: flex; align-items: center; justify-content: space-between;">
-                    <div style="font-size: 16px; text-align: left; flex-grow: 1; cursor: grab; margin: 5px; font-weight: bold;">${scriptName}</div>
-                    <button class="NiceFont_close-btn" id="NiceFont_close-btn" style="border: none; border-radius: 3px; padding: 1px 6px; cursor: pointer; line-height: 16px; font-size: 12px; background: none; color: #000;">✖️</button>
-                </div>
-                <div class="NiceFont_content"></div>
-            `;
+            <div class="NiceFont_header" style="position: relative; z-index: 10002; display: flex; align-items: center; justify-content: space-between;">
+                <div style="font-size: 16px; text-align: left; flex-grow: 1; cursor: grab; margin: 5px; font-weight: bold;">${scriptName}</div>
+                <button class="NiceFont_close-btn" id="NiceFont_close-btn" style="border: none; border-radius: 3px; padding: 1px 6px; cursor: pointer; line-height: 16px; font-size: 12px; background: none; color: #000;">✖️</button>
+            </div>
+            <div class="NiceFont_content"></div>
+        `;
 
             // 填充内容区域
             this.updatePanelContent();
 
-            // 确保 DOM 可用并添加面板
+            // 添加到 DOM
             try {
-                if (document.body) {
-                    document.body.appendChild(this.overlayCache);
-                    document.body.appendChild(this.panelCache);
-                    log('浮动面板创建成功');
-                } else {
-                    console.error('[NiceFont] document.body 不可用');
-                    return;
-                }
+                document.body.appendChild(this.overlayCache);
+                document.body.appendChild(this.panelCache);
+                log('浮动面板创建并添加到 DOM');
             } catch (e) {
-                console.error('[NiceFont] 创建面板失败:', e);
+                console.error('[NiceFont] 添加面板到 DOM 失败:', e);
+                this.panelCache = null;
+                this.overlayCache = null;
                 return;
             }
 
@@ -912,6 +967,10 @@
             const header = this.panelCache.querySelector('.NiceFont_header');
             if (!header) {
                 console.error('[NiceFont] 未找到 .NiceFont_header，无法绑定拖拽事件');
+                this.panelCache.remove();
+                this.overlayCache.remove();
+                this.panelCache = null;
+                this.overlayCache = null;
                 return;
             }
 
@@ -1018,7 +1077,6 @@
                         let closeCount = GM_getValue('NiceFont_closeCount', 0);
 
                         if (now - lastCloseTime > CLOSE_TRACKING_WINDOW) {
-                            // 重置计数（超出时间窗口）
                             closeCount = 0;
                             log('关闭计数重置（超出时间窗口）');
                         }
@@ -1044,8 +1102,23 @@
          * 更新面板内容
          */
         updatePanelContent() {
-            if (!this.panelCache) return;
+            if (!this.panelCache) {
+                log('panelCache 不存在，跳过更新内容');
+                return;
+            }
             const t = translations[State.get('currentLanguage')] || translations.en;
+            const scriptName = GM_info?.script?.name || 'NiceFont';
+
+            // 更新标题
+            const headerDiv = this.panelCache.querySelector('.NiceFont_header > div');
+            if (headerDiv) {
+                headerDiv.textContent = scriptName;
+                log('面板标题更新为:', scriptName);
+            } else {
+                console.error('[NiceFont] 未找到 .NiceFont_header > div，无法更新标题');
+            }
+
+            // 更新内容区域
             const contentContainer = this.panelCache.querySelector('.NiceFont_content');
             if (contentContainer) {
                 contentContainer.innerHTML = this.getCommandsConfig()
@@ -1088,26 +1161,43 @@
          * 显示/隐藏面板
          */
         togglePanel() {
-            if (State.get('panelType') !== 'floating') return;
+            if (State.get('panelType') !== 'floating') {
+                log('非浮动面板模式，忽略 togglePanel');
+                return;
+            }
             const now = Date.now();
             if (now - this.lastToggleTime < 300) {
                 log('togglePanel 防抖，忽略快速重复调用');
                 return;
             }
             this.lastToggleTime = now;
-            if (!this.panelCache) {
+
+            // 确保 DOM 已就绪
+            if (!document.body) {
+                console.error('[NiceFont] document.body 不可用，延迟 togglePanel');
+                return;
+            }
+
+            // 如果 panelCache 不存在或未附加到 DOM，强制创建
+            if (!this.panelCache || !document.body.contains(this.panelCache)) {
+                log('panelCache 不存在或未附加到 DOM，尝试重新创建');
                 this.createFloatingPanel();
-                if (this.panelCache) {
-                    this.panelCache.style.display = 'block';
-                    this.overlayCache.style.display = 'block';
-                    log('面板显示状态: block (新建)');
+                if (!this.panelCache) {
+                    console.error('[NiceFont] 面板创建失败，检查 createFloatingPanel');
+                    return;
                 }
-            } else {
-                const isHidden = this.panelCache.style.display === 'none';
-                const display = isHidden ? 'block' : 'none';
-                this.panelCache.style.display = display;
-                this.overlayCache.style.display = display;
-                log(`面板显示状态: ${display}`);
+            }
+
+            // 切换显示状态
+            const isHidden = this.panelCache.style.display === 'none';
+            const display = isHidden ? 'block' : 'none';
+            this.panelCache.style.display = display;
+            this.overlayCache.style.display = display;
+            log(`面板显示状态: ${display}`);
+
+            // 如果显示面板，更新内容
+            if (display === 'block') {
+                this.updatePanelContent();
             }
         },
 
@@ -1127,20 +1217,12 @@
                 }
             } else {
                 this.updateTampermonkeyMenu();
-                const hasConfig = ConfigScopeManager.hasConfig();
-                const autoOpenDisabled = GM_getValue('NiceFont_autoOpenDisabled', false);
-                if (!this.panelCache && !hasConfig && !autoOpenDisabled) {
-                    this.createFloatingPanel();
-                    if (this.panelCache) {
-                        this.panelCache.style.display = 'block';
-                        this.overlayCache.style.display = 'block';
-                        log('自动创建并显示浮动面板（无配置且未禁用自动弹出）');
-                    }
-                } else if (this.panelCache) {
+                // 如果 panelCache 存在，更新内容；否则等待 togglePanel 创建
+                if (this.panelCache && document.body.contains(this.panelCache)) {
                     this.updatePanelContent();
                     log('更新已有面板内容');
                 } else {
-                    log('跳过自动创建面板（已有配置、已禁用自动弹出或面板已移除）');
+                    log('panelCache 不存在，等待 togglePanel 创建');
                 }
                 const t = translations[State.get('currentLanguage')] || translations.en;
                 const saveBtn = this.panelCache?.querySelector('#NiceFont_save-config');
@@ -1491,12 +1573,6 @@
 
     // --- CSS 样式 ---
     GM_addStyle(`
-        :root {
-            --nicefont-family: none;
-        }
-        *:not(#NiceFont_panel):not([data-nicefont-panel]):not(#NiceFont_panel *) {
-            font-family: var(--nicefont-family, inherit) !important;
-        }
         #NiceFont_panel {
             position: fixed;
             width: 300px;
@@ -1570,6 +1646,19 @@
      * 初始化脚本
      */
     function init() {
+        // 检查旧版本存储数据并清理（用于升级兼容）
+        const oldVersion = GM_getValue('NiceFont_version', '0.0');
+        const currentVersion = GM_info?.script?.version;
+        if (oldVersion !== currentVersion) {
+            // 清理可能导致冲突的旧存储
+            GM_setValue('NiceFont_autoOpenDisabled', false);
+            GM_setValue('NiceFont_closeCount', 0);
+            GM_setValue('NiceFont_lastCloseTime', 0);
+            GM_setValue('NiceFont_autoShowAfterLanguageSwitch', true); // 默认启用自动显示
+            GM_setValue('NiceFont_version', currentVersion);
+            log(`检测到版本升级: ${oldVersion} -> ${currentVersion}，清理旧存储数据`);
+        }
+
         // 初始化语言
         let lang = GM_getValue('language', navigator.language);
         if (!translations[lang]) {
@@ -1589,6 +1678,27 @@
 
         // 初始化界面
         UIManager.updateUI();
+
+        // 延迟创建浮动面板，直到 DOM 就绪
+        function initializePanel() {
+            if (State.get('panelType') === 'floating' && (!UIManager.panelCache || !document.body.contains(UIManager.panelCache))) {
+                UIManager.createFloatingPanel();
+                if (UIManager.panelCache) {
+                    UIManager.panelCache.style.display = 'none';
+                    UIManager.overlayCache.style.display = 'none';
+                    log('首次初始化浮动面板，设置为隐藏状态');
+                } else {
+                    console.error('[NiceFont] 初始创建浮动面板失败');
+                }
+            }
+        }
+
+        if (document.body) {
+            initializePanel();
+        } else {
+            document.addEventListener('DOMContentLoaded', initializePanel, { once: true });
+            log('document.body 未就绪，延迟面板初始化至 DOMContentLoaded');
+        }
 
         // 初始化字体调整
         window.addEventListener('load', () => {

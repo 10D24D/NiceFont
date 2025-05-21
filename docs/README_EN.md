@@ -51,6 +51,12 @@ If you like this project, consider giving [NiceFont](https://github.com/10D24D/N
 
 ## 📜 Changelog
 
+### v3.2-2025-05-21 
+- ** Fix ** : 
+  - Resolved the issue where using global CSS variables affected the original layout of the page, and restored the way font Settings were directly applied to DOM nodes. 
+  - Fixed the issue where the font adjustment function in the Oil Monkey menu mode did not pop up the Settings window. 
+  - Fixed the issue where the web page menu mode could not be displayed when switching menu languages or in other abnormal situations.
+
 ### v3.1 - 2025-05-20
 - **Other**:
   - Refined project description.
