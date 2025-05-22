@@ -10,7 +10,7 @@
 // @name:de       NiceFont (Schöne Schrift)
 // @name:es       NiceFont (Fuente agradable)
 // @name:pt       NiceFont (Fonte agradável)
-// @version      4.0.0
+// @version      4.0.1
 // @author       DD1024z
 // @description  NiceFont: 是一款优化网页字体显示的工具，让浏览更清晰、舒适！“真正调整字体，而非页面缩放，拒绝将就”！可直接修改网页的字体大小与风格，保存你的字体设置，轻松应用到每个网页，支持首次、定时或动态调整字体，适配子域名、整站或全局设置，几乎兼容所有网站！
 // @description:zh-CN  NiceFont: 是一款优化网页字体显示的工具，让浏览更清晰、舒适！“真正调整字体，而非页面缩放，拒绝将就”！可直接修改网页的字体大小与风格，保存你的字体设置，轻松应用到每个网页，支持首次、定时或动态调整字体，适配子域名、整站或全局设置，几乎兼容所有网站！
@@ -1830,12 +1830,12 @@
         const oldVersion = GM_getValue('NiceFont_version', '0.0');
         const currentVersion = GM_info?.script?.version;
         if (oldVersion !== currentVersion) {
-            // 清理可能导致冲突的旧存储
             let keys = GM_listValues();
             keys.forEach(key => {
                 GM_deleteValue(key);
             });
-            log(`检测到版本升级: ${oldVersion} -> ${currentVersion}，清理可能导致冲突的旧存储`);
+            GM_setValue('NiceFont_version', currentVersion);
+            log(`检测到版本升级: ${oldVersion} -> ${currentVersion}，清理旧存储并保存新版本`);
         }
 
         let panelType = GM_getValue(Constants.PANEL_TYPE_KEY, 'pluginPanel');
