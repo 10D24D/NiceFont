@@ -48,6 +48,11 @@ If you like this plugin, please give our GitHub project [NiceFont](https://githu
 
 ## 📜 Changelog
 
+### v4.0.2-2026-02-15
+
+- **Fixes**:
+  - Fixed the BUG where the font (0px) that was not displayed was also resized.
+
 ### v4.0.0 - 2025-05-22
 
 - **New Features**:
