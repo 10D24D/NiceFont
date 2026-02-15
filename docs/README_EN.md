@@ -48,6 +48,11 @@ If you like this plugin, please give our GitHub project [NiceFont](https://githu
 
 ## 📜 Changelog
 
+### v4.0.3 - 2026-02-15
+
+- **Improvements**:
+  - Enhance font size control effect: Support scaling the size of prompt words in input boxes.
+
 ### v4.0.2-2026-02-15
 
 - **Fixes**:
