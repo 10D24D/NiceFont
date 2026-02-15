@@ -10,7 +10,7 @@
 // @name:de       NiceFont (Schöne Schrift)
 // @name:es       NiceFont (Fuente agradable)
 // @name:pt       NiceFont (Fonte agradável)
-// @version      4.0.1
+// @version      4.0.2
 // @author       DD1024z
 // @description  NiceFont: 是一款优化网页字体显示的工具，让浏览更清晰、舒适！“真正调整字体，而非页面缩放，拒绝将就”！可直接修改网页的字体大小与风格，保存你的字体设置，轻松应用到每个网页，支持首次、定时或动态调整字体，适配子域名、整站或全局设置，几乎兼容所有网站！
 // @description:zh-CN  NiceFont: 是一款优化网页字体显示的工具，让浏览更清晰、舒适！“真正调整字体，而非页面缩放，拒绝将就”！可直接修改网页的字体大小与风格，保存你的字体设置，轻松应用到每个网页，支持首次、定时或动态调整字体，适配子域名、整站或全局设置，几乎兼容所有网站！
@@ -26,8 +26,6 @@
 // @homepageURL   https://github.com/10D24D/NiceFont/
 // @namespace    https://github.com/10D24D/NiceFont/
 // @icon         https://raw.githubusercontent.com/10D24D/NiceFont/main/static/logo.png
-// @downloadURL  https://update.greasyfork.org/scripts/533232/NiceFont.user.js
-// @updateURL    https://update.greasyfork.org/scripts/533232/NiceFont.meta.js
 // @match        *://*/*
 // @license      Apache License 2.0
 // @grant        GM_registerMenuCommand
@@ -46,6 +44,8 @@
 // @compatible   Safari version≥15.4 (Compatible Tampermonkey, Userscripts)
 // @create       2025-4-18
 // @copyright    2025, DD1024z
+// @downloadURL https://update.greasyfork.org/scripts/533232/NiceFont%20%28%E8%80%90%E8%A7%86%E5%AD%97%E4%BD%93%29.user.js
+// @updateURL https://update.greasyfork.org/scripts/533232/NiceFont%20%28%E8%80%90%E8%A7%86%E5%AD%97%E4%BD%93%29.meta.js
 // ==/UserScript==
 
 (function () {
@@ -1072,14 +1072,16 @@
                     if (!node.hasAttribute('data-default-fontsize')) {
                         node.setAttribute('data-default-fontsize', currentFontSize);
                     }
-                    const baseFontSize = parseFloat(Utils.convertToPx(node, node.getAttribute('data-default-fontsize')));
-                    if (!isNaN(baseFontSize)) {
-                        node.style.setProperty('font-size', `${baseFontSize + increment}px`, 'important');
-                    }
-                    if (font !== 'none') {
-                        node.style.setProperty('font-family', font, 'important');
-                    } else {
-                        node.style.removeProperty('font-family');
+                    if (currentFontSize != '0px') {
+                        const baseFontSize = parseFloat(Utils.convertToPx(node, node.getAttribute('data-default-fontsize')));
+                        if (!isNaN(baseFontSize)) {
+                            node.style.setProperty('font-size', `${baseFontSize + increment}px`, 'important');
+                        }
+                        if (font !== 'none') {
+                            node.style.setProperty('font-family', font, 'important');
+                        } else {
+                            node.style.removeProperty('font-family');
+                        }
                     }
                 }
             });
