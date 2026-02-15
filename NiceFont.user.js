@@ -10,7 +10,7 @@
 // @name:de       NiceFont (Schöne Schrift)
 // @name:es       NiceFont (Fuente agradable)
 // @name:pt       NiceFont (Fonte agradável)
-// @version      4.0.2
+// @version      4.0.3
 // @author       DD1024z
 // @description  NiceFont: 是一款优化网页字体显示的工具，让浏览更清晰、舒适！“真正调整字体，而非页面缩放，拒绝将就”！可直接修改网页的字体大小与风格，保存你的字体设置，轻松应用到每个网页，支持首次、定时或动态调整字体，适配子域名、整站或全局设置，几乎兼容所有网站！
 // @description:zh-CN  NiceFont: 是一款优化网页字体显示的工具，让浏览更清晰、舒适！“真正调整字体，而非页面缩放，拒绝将就”！可直接修改网页的字体大小与风格，保存你的字体设置，轻松应用到每个网页，支持首次、定时或动态调整字体，适配子域名、整站或全局设置，几乎兼容所有网站！
@@ -1067,7 +1067,9 @@
             this.traverseDOM(el, (node) => {
                 const style = this.getCachedStyle(node);
                 const isVisible = style.display !== 'none' && style.visibility !== 'hidden';
-                if (Utils.hasVisibleText(node) && isVisible) {
+                // 新增：对 textarea 和 input 强制处理，即使没有子文本
+                const isFormControl = node.tagName === 'TEXTAREA' || node.tagName === 'INPUT';
+                if ((Utils.hasVisibleText(node) || isFormControl) && isVisible) {
                     let currentFontSize = node.style.fontSize || style.fontSize;
                     if (!node.hasAttribute('data-default-fontsize')) {
                         node.setAttribute('data-default-fontsize', currentFontSize);
@@ -1077,6 +1079,7 @@
                         if (!isNaN(baseFontSize)) {
                             node.style.setProperty('font-size', `${baseFontSize + increment}px`, 'important');
                         }
+                        const font = appState.currentFontFamily;
                         if (font !== 'none') {
                             node.style.setProperty('font-family', font, 'important');
                         } else {
@@ -1093,15 +1096,18 @@
             appState.intervalSeconds = 0;
             appState.firstAdjustmentTime = 0;
             this.traverseDOM(el, (node) => {
-                const defaultSize = node.getAttribute('data-default-fontsize');
-                if (defaultSize) {
-                    node.style.fontSize = defaultSize;
-                    node.removeAttribute('data-default-fontsize');
-                } else {
-                    node.style.removeProperty('font-size');
+                const isFormControl = node.tagName === 'TEXTAREA' || node.tagName === 'INPUT';
+                if (Utils.hasVisibleText(node) || isFormControl) {
+                    const defaultSize = node.getAttribute('data-default-fontsize');
+                    if (defaultSize) {
+                        node.style.fontSize = defaultSize;
+                        node.removeAttribute('data-default-fontsize');
+                    } else {
+                        node.style.removeProperty('font-size');
+                    }
+                    node.style.removeProperty('font-family');
+                    this.styleCache.delete(node);
                 }
-                node.style.removeProperty('font-family');
-                this.styleCache.delete(node);
             });
         },
 
