@@ -49,7 +49,13 @@ If you like this plugin, please give our GitHub project [NiceFont](https://githu
 
 ## 📜 Changelog
 
-### v4.1.0 - 2026-03-04
+### v4.1.1 - 2026-03-05
+
+- **Improvements**:
+  - Floating panel style isolation: Prevents page styles (e.g., GitHub) from affecting the panel display.
+  - Panel theme adaptation: Supports light/dark mode, follows system `prefers-color-scheme`.
+
+### v4.1.0 - 2026-03-05
 
 - **New Features**:
   - Added "Switch Panel": Use floating panel for a cleaner Tampermonkey menu; smart popup on sites without font configuration.

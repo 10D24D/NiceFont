@@ -10,7 +10,7 @@
 // @name:de       NiceFont (Schöne Schrift)
 // @name:es       NiceFont (Fuente agradable)
 // @name:pt       NiceFont (Fonte agradável)
-// @version      4.1.0
+// @version      4.1.1
 // @author       DD1024z
 // @description  NiceFont: 是一款优化网页字体显示的工具，让浏览更清晰、舒适！“真正调整字体，而非页面缩放，拒绝将就”！可直接修改网页的字体大小与风格，保存你的字体设置，轻松应用到每个网页，支持首次、定时或动态调整字体，适配子域名、整站或全局设置，几乎兼容所有网站！
 // @description:zh-CN  NiceFont: 是一款优化网页字体显示的工具，让浏览更清晰、舒适！“真正调整字体，而非页面缩放，拒绝将就”！可直接修改网页的字体大小与风格，保存你的字体设置，轻松应用到每个网页，支持首次、定时或动态调整字体，适配子域名、整站或全局设置，几乎兼容所有网站！
@@ -522,7 +522,7 @@
             const data = {};
             keys.forEach(k => { data[k] = GM_getValue(k, null); });
             const json = JSON.stringify({
-                version: GM_info?.script?.version || '4.1.0',
+                version: GM_info?.script?.version || '4.1.1',
                 exportedAt: new Date().toISOString(),
                 data
             }, null, 2);
@@ -1198,18 +1198,16 @@
             const shadow = this.panelCache.attachShadow({ mode: 'open' });
 
             const panelContainer = document.createElement('div');
+            panelContainer.className = 'NiceFont_panel-container';
             panelContainer.style.cssText = `
                 position: fixed;
                 top: ${savedPosition.top};
                 right: ${savedPosition.right};
                 left: auto;
                 width: 300px;
-                background: #fff;
-                border: 1px solid #ccc;
                 border-radius: 5px;
                 padding: 10px;
-                box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-                z-index: 10001;
+                z-index: 2147483647;
                 font-family: sans-serif !important;
                 font-size: 15px !important;
                 user-select: none;
@@ -1222,7 +1220,7 @@
                         <img src="${logoUrl}" alt="NiceFont" class="NiceFont_logo" style="width: 24px; height: 24px; margin-right: 8px; flex-shrink: 0;">
                         <div class="NiceFont_title" style="font-size: 16px; font-weight: bold;">${scriptName}</div>
                     </div>
-                    <button class="NiceFont_close-btn" id="NiceFont_close-btn" style="border: none; border-radius: 3px; padding: 1px 6px; cursor: pointer; line-height: 16px; font-size: 12px; background: none; color: #000;">✖️</button>
+                    <button class="NiceFont_close-btn" id="NiceFont_close-btn" type="button">✖️</button>
                 </div>
                 <div class="NiceFont_content"></div>
             `;
@@ -1230,28 +1228,52 @@
             const styleSheet = document.createElement('style');
             styleSheet.textContent = `
                 :host {
+                    all: initial;
                     display: block;
+                    font-family: sans-serif !important;
+                    font-size: 15px !important;
+                    line-height: 1.5 !important;
+                    box-sizing: border-box;
+                }
+                :host * {
+                    box-sizing: border-box;
                 }
                 div {
                     font-family: sans-serif !important;
                     font-size: 15px !important;
+                    color: inherit !important;
+                }
+                .NiceFont_panel-container {
+                    background: #fff !important;
+                    color: #333 !important;
+                    border: 1px solid #ccc !important;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+                }
+                @media (prefers-color-scheme: dark) {
+                    .NiceFont_panel-container {
+                        background: #1e1e1e !important;
+                        color: #e0e0e0 !important;
+                        border: 1px solid #444 !important;
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+                    }
                 }
                 .NiceFont_header-left {
                     cursor: grab;
                 }
                 .NiceFont_title {
                     font-size: 16px !important;
-                    font-weight: bold;
+                    font-weight: bold !important;
+                    color: inherit !important;
                 }
                 .NiceFont_close-btn {
-                    border: none;
+                    border: none !important;
                     border-radius: 3px;
                     padding: 1px 6px;
                     cursor: pointer;
                     line-height: 16px;
-                    font-size: 12px;
-                    background: none;
-                    color: #000;
+                    font-size: 12px !important;
+                    background: transparent !important;
+                    color: inherit !important;
                 }
                 .NiceFont_close-btn:hover {
                     text-decoration: underline;
@@ -1264,6 +1286,8 @@
                     text-align: left;
                     font-size: 15px !important;
                     font-weight: bold;
+                    color: inherit !important;
+                    background: transparent !important;
                 }
                 .action-btn:hover {
                     text-decoration: underline;
@@ -1277,10 +1301,20 @@
                     width: auto;
                     padding: 2px;
                     margin-left: 5px;
-                    border: 1px solid #ddd;
+                    border: 1px solid #ddd !important;
                     border-radius: 3px;
-                    font-size: 14px;
+                    font-size: 14px !important;
+                    font-family: sans-serif !important;
+                    color: #333 !important;
+                    background: #fff !important;
                     vertical-align: middle;
+                }
+                @media (prefers-color-scheme: dark) {
+                    .font-family-select {
+                        border-color: #555 !important;
+                        color: #e0e0e0 !important;
+                        background: #2d2d2d !important;
+                    }
                 }
             `;
             shadow.appendChild(styleSheet);
