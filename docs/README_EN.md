@@ -37,6 +37,7 @@ If you like this plugin, please give our GitHub project [NiceFont](https://githu
 - **🌐 Multi-Language Support**: Menu supports 9 languages and automatically switches based on browser language.
 - **🚫 Exclude Elements**: Exclude custom CSS selectors and webpage elements.
 - **📍 Current Configuration Scope**: Supports excluding sites or matching subdomains, top-level domains, and all websites for font adjustments (click to delete corresponding configurations as needed).
+- **📋 Export Import Config**: Export all configurations as a JSON file for quick restore on a new computer.
 - **💾 Save Configuration**: Persistently save font adjustment configurations locally, remaining effective upon reopening pages.
 
 ## 🚀 Installation Steps
@@ -48,12 +49,22 @@ If you like this plugin, please give our GitHub project [NiceFont](https://githu
 
 ## 📜 Changelog
 
+### v4.1.0 - 2026-03-04
+
+- **New Features**:
+  - Added "Switch Panel": Use floating panel for a cleaner Tampermonkey menu; smart popup on sites without font configuration.
+  - Added "Export Import Config": Export all configurations as a JSON file for quick restore on a new computer.
+- **Improvements**:
+  - Code optimization and improved comments.
+- **Fixes**:
+  - Fixed excluded site not working.
+
 ### v4.0.3 - 2026-02-15
 
 - **Improvements**:
   - Enhance font size control effect: Support scaling the size of prompt words in input boxes.
 
-### v4.0.2-2026-02-15
+### v4.0.2 - 2026-02-15
 
 - **Fixes**:
   - Fixed the BUG where the font (0px) that was not displayed was also resized.
