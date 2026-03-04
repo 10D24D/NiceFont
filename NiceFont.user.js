@@ -10,10 +10,9 @@
 // @name:de       NiceFont (Schöne Schrift)
 // @name:es       NiceFont (Fuente agradable)
 // @name:pt       NiceFont (Fonte agradável)
-// @version      4.1.3
+// @version      4.2.0
 // @author       DD1024z
 // @description  NiceFont: 是一款优化网页字体显示的工具，让浏览更清晰、舒适！“真正调整字体，而非页面缩放，拒绝将就”！可直接修改网页的字体大小与风格，保存你的字体设置，轻松应用到每个网页，支持首次、定时或动态调整字体，适配子域名、整站或全局设置，几乎兼容所有网站！
-// @description:zh-CN  NiceFont: 是一款优化网页字体显示的工具，让浏览更清晰、舒适！“真正调整字体，而非页面缩放，拒绝将就”！可直接修改网页的字体大小与风格，保存你的字体设置，轻松应用到每个网页，支持首次、定时或动态调整字体，适配子域名、整站或全局设置，几乎兼容所有网站！
 // @description:zh-TW  NiceFont：優化網頁字體顯示的工具，瀏覽更清晰、舒適！「真正調整字體，非頁面縮放，拒絕將就」！直接修改字體大小與風格，儲存設定，輕鬆應用於各網頁，支援首次、定時或動態調整，適配子域名或全局設定，幾乎相容所有網站！
 // @description:en     NiceFont: Optimize web font display for clear, comfortable browsing! "Adjusts fonts directly, not page scaling—no compromises!" Modify font size & style, save settings, apply to all pages. Supports one-time, scheduled, or dynamic adjustments, for subdomains or globally. Works on nearly all sites!
 // @description:ko     NiceFont: 웹 폰트 표시를 최적화하여 선명하고 편안한 브라우징! "페이지를 스케일링하지 않고 폰트를 조정—타협 없음!" 폰트 크기와 스타일을 수정, 설정 저장, 모든 페이지에 적용. 최초, 정기, 동적 조정 지원, 서브도메인 또는 전역 설정. 거의 모든 사이트 호환!
@@ -36,6 +35,7 @@
 // @grant        GM_addStyle
 // @grant        GM_info
 // @grant        GM_listValues
+// @grant        GM_download
 // @run-at       document-start
 // @compatible   edge version≥90 (Compatible Tampermonkey, Violentmonkey)
 // @compatible   Chrome version≥90 (Compatible Tampermonkey, Violentmonkey)
@@ -50,9 +50,7 @@
 
 /**
  * NiceFont - 网页字体优化工具
- *
- * 功能：调整网页字体大小与风格，支持首次/定时/动态调整，配置可保存到子域名/整站/全局。
- * 结构：Utils(工具) -> appState(状态) -> ConfigScopeManager(范围) -> ConfigManager(配置) -> FontManager(字体) -> UIManager(界面)
+ * 结构：Utils -> appState -> ConfigScopeManager -> ConfigManager -> FontManager -> UIManager
  */
 (function () {
     'use strict';
@@ -168,7 +166,9 @@
         observer: null,
         timer: null,
         isAutoOpened: false,
-        excludedSelectors: ['img', 'i', 'code', 'code *'],
+        excludedSelectors: ['i', 'code', 'code *', 'pre', 'pre *', 'svg', 'canvas', 'kbd', 'samp'],
+        textStroke: 0,
+        textShadow: 0,
         isExcludedSite: false,
     };
 
@@ -185,6 +185,8 @@
             timer: appState.intervalSeconds,
             firstTime: appState.firstAdjustmentTime,
             excludedSelectors: JSON.stringify(appState.excludedSelectors),
+            textStroke: appState.textStroke,
+            textShadow: appState.textShadow,
         };
     }
 
@@ -198,6 +200,8 @@
             appState.isConfigModified = true;
             return;
         }
+        const strokeEq = Math.abs(appState.textStroke - (lastSavedSnapshot.textStroke ?? 0)) < 1e-6;
+        const shadowEq = Math.abs(appState.textShadow - (lastSavedSnapshot.textShadow ?? 0)) < 1e-6;
         appState.isConfigModified = (
             appState.currentAdjustment !== lastSavedSnapshot.resize ||
             appState.currentFontFamily !== lastSavedSnapshot.fontFamily ||
@@ -205,14 +209,13 @@
             appState.dynamicAdjustment !== lastSavedSnapshot.watcher ||
             appState.intervalSeconds !== lastSavedSnapshot.timer ||
             appState.firstAdjustmentTime !== lastSavedSnapshot.firstTime ||
-            JSON.stringify(appState.excludedSelectors) !== lastSavedSnapshot.excludedSelectors
+            JSON.stringify(appState.excludedSelectors) !== lastSavedSnapshot.excludedSelectors ||
+            !strokeEq ||
+            !shadowEq
         );
     }
 
-    /**
-     * 配置范围管理：0=排除本站 1=子域名 2=顶级域 3=全局
-     * 负责生成存储键、判断生效范围、删除配置
-     */
+    /** 配置范围管理：0=排除本站 1=子域名 2=顶级域 3=全局 */
     const ConfigScopeManager = {
         scopeMap: { 0: 'excludeThisSite', 1: 'subdomain', 2: 'topLevelDomain', 3: 'allWebsites' },
 
@@ -317,10 +320,7 @@
         }
     };
 
-    /**
-     * 配置管理：加载/保存/删除/导出导入
-     * 从 GM 存储读取，按范围优先级（排除 > 子域名 > 顶级域 > 全局）选择生效配置
-     */
+    /** 配置管理：加载/保存/删除/导出导入 */
     const ConfigManager = {
         /** 按优先级加载配置到 appState */
         loadConfig() {
@@ -333,10 +333,12 @@
                 appState.isExcludedSite = true;
                 appState.currentAdjustment = 0;
                 appState.currentFontFamily = 'none';
+                appState.textStroke = 0;
+                appState.textShadow = 0;
                 appState.dynamicAdjustment = false;
                 appState.intervalSeconds = 0;
                 appState.firstAdjustmentTime = 0;
-                appState.excludedSelectors = ['img', 'i', 'code', 'code *'];
+                appState.excludedSelectors = ['i', 'code', 'code *', 'pre', 'pre *', 'svg', 'canvas', 'kbd', 'samp'];
                 appState.targetScope = 0;
                 updateSavedSnapshot();
                 log('加载排除站点配置');
@@ -367,7 +369,9 @@
             appState.firstAdjustmentTime = (typeof config.firstTime === 'number' && config.firstTime >= 0) ? config.firstTime : 0;
             appState.excludedSelectors = Array.isArray(config.excludedSelectors) && config.excludedSelectors.length > 0
                 ? config.excludedSelectors
-                : ['img', 'i', 'code', 'code *'];
+                : ['i', 'code', 'code *', 'pre', 'pre *', 'svg', 'canvas', 'kbd', 'samp'];
+            appState.textStroke = FontManager.parseStrokeValue(config.textStroke);
+            appState.textShadow = FontManager.parseShadowValue(config.textShadow);
             appState.targetScope = [0, 1, 2, 3].includes(effectiveScope) ? effectiveScope : 1;
 
             updateSavedSnapshot();
@@ -408,6 +412,8 @@
                     appState.isExcludedSite = true;
                     appState.currentAdjustment = 0;
                     appState.currentFontFamily = 'none';
+                    appState.textStroke = 0;
+                    appState.textShadow = 0;
                     appState.dynamicAdjustment = false;
                     appState.intervalSeconds = 0;
                     appState.firstAdjustmentTime = 0;
@@ -421,7 +427,9 @@
                         timer: appState.intervalSeconds,
                         fontFamily: appState.currentFontFamily,
                         firstTime: appState.firstAdjustmentTime,
-                        excludedSelectors: appState.excludedSelectors
+                        excludedSelectors: appState.excludedSelectors,
+                        textStroke: appState.textStroke,
+                        textShadow: appState.textShadow
                     };
                     GM_setValue(key, config);
                     appState.isExcludedSite = false;
@@ -516,27 +524,36 @@
             return false;
         },
 
-        /** 导出所有 NiceFont_ 开头的 GM 存储为 JSON 文件 */
+        /** 导出所有 NiceFont_ 开头的 GM 存储为 JSON 文件，优先使用 GM_download */
         exportConfig() {
             const keys = GM_listValues().filter(k => k.startsWith('NiceFont_'));
             const data = {};
             keys.forEach(k => { data[k] = GM_getValue(k, null); });
             const json = JSON.stringify({
-                version: GM_info?.script?.version || '4.1.3',
+                version: GM_info?.script?.version || '4.2.0',
                 exportedAt: new Date().toISOString(),
                 data
             }, null, 2);
-            const blob = new Blob([json], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `NiceFont_config_${new Date().toISOString().slice(0, 10)}.json`;
-            a.style.display = 'none';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            setTimeout(() => URL.revokeObjectURL(url), 100);
-            log('配置已导出');
+            const filename = `NiceFont_config_${new Date().toISOString().slice(0, 10)}.json`;
+            if (typeof GM_download === 'function') {
+                const blob = new Blob([json], { type: 'application/json' });
+                const blobUrl = URL.createObjectURL(blob);
+                GM_download({ url: blobUrl, name: filename, saveAs: true });
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
+                log('配置已导出 (GM_download)');
+            } else {
+                const blob = new Blob([json], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.style.display = 'none';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(url), 100);
+                log('配置已导出 (anchor)');
+            }
         },
 
         /** 从 JSON 文件导入配置，展示新增/修改/删除数量后确认写入 */
@@ -587,24 +604,49 @@
             input.click();
         },
 
-        /** 导出/导入入口：prompt 选择 1 或 2 */
+        /** 清空所有 NiceFont_ 配置，需输入 y 确认 */
+        clearAllConfig() {
+            const input = prompt(t.clearAllConfigConfirm);
+            if (input?.trim().toLowerCase() !== 'y') return;
+            const keys = GM_listValues().filter(k => k.startsWith('NiceFont_'));
+            keys.forEach(k => GM_deleteValue(k));
+            appState.currentAdjustment = 0;
+            appState.currentFontFamily = 'none';
+            appState.textStroke = 0;
+            appState.textShadow = 0;
+            appState.targetScope = 1;
+            appState.pendingScopeChange = null;
+            appState.isExcludedSite = false;
+            appState.isConfigModified = false;
+            appState.dynamicAdjustment = false;
+            appState.intervalSeconds = 0;
+            appState.firstAdjustmentTime = 0;
+            ConfigManager.loadConfig();
+            updateSavedSnapshot();
+            setupScheduledAdjustments();
+            UIManager.updateUI();
+            FontManager.restoreFont(document.body);
+            log('已清空所有配置');
+        },
+
+        /** 导出/导入入口：prompt 选择 1、2 或 3（插件面板时支持 3 清空） */
         exportImportConfig() {
             const choice = prompt(t.exportImportPrompt);
             if (choice === '1') ConfigManager.exportConfig();
             else if (choice === '2') ConfigManager.importConfig();
+            else if (choice === '3') ConfigManager.clearAllConfig();
         }
     };
 
-    /**
-     * 字体管理：遍历 DOM 应用/恢复字体，支持 iframe 与 Shadow DOM
-     * 字体列表可动态扩展（系统字体、页面字体、用户自定义）
-     */
+    /** 字体管理：遍历 DOM 应用/恢复字体，支持 iframe、Shadow DOM，字体列表可动态扩展 */
     const FontManager = {
+        /** 精简字体列表：参考「字体渲染」脚本，保留常用中英文字体，移除对显示无实质影响的 generic 关键字 */
         supportFonts: [
-            'custom', 'auto', 'none', 'Arial', 'cursive', 'fangsong', 'fantasy', 'monospace',
-            'sans-serif', 'serif', 'system-ui', 'ui-monospace', 'ui-rounded', 'ui-sans-serif',
-            'ui-serif', '-webkit-body', 'inherit', 'initial', 'unset', 'Verdana', 'Helvetica',
-            'Tahoma', 'Times New Roman', 'Georgia', 'Courier New', 'Comic Sans MS'
+            'custom', 'auto', 'none',
+            'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', 'Sarasa Gothic SC',
+            'Source Han Sans SC', 'Hiragino Sans GB', 'HarmonyOS Sans SC', 'LXGW WenKai',
+            'sans-serif', 'serif', 'monospace',
+            'Arial', 'Verdana', 'Georgia', 'Times New Roman'
         ],
         systemFontsCache: [],
         styleCache: new WeakMap(),
@@ -673,6 +715,28 @@
             return true;
         },
 
+        /** 解析描边值：0-1 数字，兼容旧版 'none' 或字符串 */
+        parseStrokeValue(v) {
+            if (typeof v === 'number' && !isNaN(v)) return Math.max(0, Math.min(1, v));
+            if (v === 'none' || v === '' || v == null) return 0;
+            const n = parseFloat(v);
+            return isNaN(n) ? 0 : Math.max(0, Math.min(1, n));
+        },
+
+        /** 解析阴影值：0-4 数字，兼容旧版 'none' 或字符串 */
+        parseShadowValue(v) {
+            if (typeof v === 'number' && !isNaN(v)) return Math.max(0, Math.min(4, v));
+            if (v === 'none' || v === '' || v == null) return 0;
+            const n = parseFloat(v);
+            return isNaN(n) ? 0 : Math.max(0, Math.min(4, n));
+        },
+
+        /** 描边数值转 CSS */
+        getStrokeCSS(v) { return v > 0 ? `${v}px #333` : ''; },
+
+        /** 阴影数值转 CSS */
+        getShadowCSS(v) { return v > 0 ? `1px 1px ${v}px #7C7C7CDD` : ''; },
+
         /** 判断元素是否匹配排除选择器 */
         isExcludedElement(el) {
             return appState.excludedSelectors.some(selector => el.matches(selector));
@@ -696,6 +760,20 @@
                             iframeDoc.documentElement.style.setProperty('font-family', font, 'important');
                         } else {
                             iframeDoc.documentElement.style.removeProperty('font-family');
+                        }
+                        const strokeCSS = FontManager.getStrokeCSS(appState.textStroke);
+                        const shadowCSS = FontManager.getShadowCSS(appState.textShadow);
+                        if (strokeCSS) {
+                            iframeDoc.documentElement.style.setProperty('-webkit-text-stroke', strokeCSS, 'important');
+                            iframeDoc.documentElement.style.setProperty('text-stroke', strokeCSS, 'important');
+                        } else {
+                            iframeDoc.documentElement.style.removeProperty('-webkit-text-stroke');
+                            iframeDoc.documentElement.style.removeProperty('text-stroke');
+                        }
+                        if (shadowCSS) {
+                            iframeDoc.documentElement.style.setProperty('text-shadow', shadowCSS, 'important');
+                        } else {
+                            iframeDoc.documentElement.style.removeProperty('text-shadow');
                         }
                         this.traverseDOM(iframeDoc.body, callback);
                     }
@@ -743,6 +821,20 @@
                         } else {
                             node.style.removeProperty('font-family');
                         }
+                        const strokeCSS = FontManager.getStrokeCSS(appState.textStroke);
+                        const shadowCSS = FontManager.getShadowCSS(appState.textShadow);
+                        if (strokeCSS) {
+                            node.style.setProperty('-webkit-text-stroke', strokeCSS, 'important');
+                            node.style.setProperty('text-stroke', strokeCSS, 'important');
+                        } else {
+                            node.style.removeProperty('-webkit-text-stroke');
+                            node.style.removeProperty('text-stroke');
+                        }
+                        if (shadowCSS) {
+                            node.style.setProperty('text-shadow', shadowCSS, 'important');
+                        } else {
+                            node.style.removeProperty('text-shadow');
+                        }
                     }
                 }
             });
@@ -752,6 +844,8 @@
         restoreFont(el) {
             appState.currentAdjustment = 0;
             appState.currentFontFamily = 'none';
+            appState.textStroke = 0;
+            appState.textShadow = 0;
             appState.intervalSeconds = 0;
             appState.firstAdjustmentTime = 0;
             this.traverseDOM(el, (node) => {
@@ -765,6 +859,9 @@
                         node.style.removeProperty('font-size');
                     }
                     node.style.removeProperty('font-family');
+                    node.style.removeProperty('-webkit-text-stroke');
+                    node.style.removeProperty('text-stroke');
+                    node.style.removeProperty('text-shadow');
                     this.styleCache.delete(node);
                 }
             });
@@ -812,7 +909,10 @@
                                 log('取消字体输入');
                             }
                         } else {
-                            let select = UIManager.panelCache?.shadowRoot?.querySelector('#NiceFont_font-family');
+                            const shadow = UIManager.panelCache?.shadowRoot;
+                            shadow?.querySelector('#NiceFont_stroke-slider-wrap')?.remove();
+                            shadow?.querySelector('#NiceFont_shadow-slider-wrap')?.remove();
+                            let select = shadow?.querySelector('#NiceFont_font-family');
                             if (select) {
                                 select.remove();
                                 document.removeEventListener('click', UIManager.closeDropdown);
@@ -823,11 +923,17 @@
                             select = document.createElement('select');
                             select.id = 'NiceFont_font-family';
                             select.className = 'font-family-select';
+                            const fontToCss = f => f.includes("'") ? `"${f.replace(/"/g, '\\"')}"` : (f.includes(' ') ? `'${f}'` : f);
                             const renderFontOptions = () => {
                                 const list = FontManager.getFontList();
-                                select.innerHTML = list.map(font =>
-                                    `<option value="${font}" ${font === appState.currentFontFamily ? 'selected' : ''}>${font === 'custom' ? t.customInput : font}</option>`
-                                ).join('');
+                                const skipPreview = ['none', 'auto', 'custom'];
+                                select.innerHTML = list.map(font => {
+                                    const label = font === 'custom' ? t.customInput : font;
+                                    const ff = skipPreview.includes(font) ? '' : ` style="font-family: ${fontToCss(font)}, sans-serif"`;
+                                    return `<option value="${font}"${font === appState.currentFontFamily ? ' selected' : ''}${ff}>${label}</option>`;
+                                }).join('');
+                                const cur = appState.currentFontFamily;
+                                select.style.fontFamily = !skipPreview.includes(cur) ? `${fontToCss(cur)}, sans-serif` : '';
                             };
                             renderFontOptions();
                             FontManager.loadSystemFonts().then(loaded => {
@@ -849,6 +955,7 @@
                                                 const option = document.createElement('option');
                                                 option.value = newFont;
                                                 option.textContent = newFont;
+                                                option.style.fontFamily = `${fontToCss(newFont)}, sans-serif`;
                                                 select.insertBefore(option, select.lastChild);
                                             }
                                             appState.currentFontFamily = newFont;
@@ -883,6 +990,48 @@
                                 document.addEventListener('click', UIManager.closeDropdown);
                                 log('字体下拉菜单创建并显示');
                             }
+                        }
+                    },
+                    displayInPluginPanel: true,
+                    displayInFloatingPanel: true
+                },
+                {
+                    id: 'setTextStroke',
+                    getText: () => `✏️ ${t.setTextStroke}: ${appState.textStroke > 0 ? appState.textStroke.toFixed(2) : t.none}`,
+                    action: () => {
+                        if (appState.panelType === 'pluginPanel') {
+                            const input = prompt(t.setTextStrokePrompt, appState.textStroke.toString());
+                            if (input !== null) {
+                                const val = FontManager.parseStrokeValue(input.trim());
+                                appState.textStroke = val;
+                                FontManager.applyFontRecursively(document.body, appState.currentAdjustment);
+                                checkConfigModified();
+                                UIManager.updateUI();
+                                log(`字体描边设置为: ${val}`);
+                            }
+                        } else {
+                            UIManager.showStrokeSlider();
+                        }
+                    },
+                    displayInPluginPanel: true,
+                    displayInFloatingPanel: true
+                },
+                {
+                    id: 'setTextShadow',
+                    getText: () => `🌑 ${t.setTextShadow}: ${appState.textShadow > 0 ? appState.textShadow.toFixed(2) : t.none}`,
+                    action: () => {
+                        if (appState.panelType === 'pluginPanel') {
+                            const input = prompt(t.setTextShadowPrompt, appState.textShadow.toString());
+                            if (input !== null) {
+                                const val = FontManager.parseShadowValue(input.trim());
+                                appState.textShadow = val;
+                                FontManager.applyFontRecursively(document.body, appState.currentAdjustment);
+                                checkConfigModified();
+                                UIManager.updateUI();
+                                log(`字体阴影设置为: ${val}`);
+                            }
+                        } else {
+                            UIManager.showShadowSlider();
                         }
                     },
                     displayInPluginPanel: true,
@@ -1007,7 +1156,7 @@
                     id: 'exclude-elements',
                     getText: () => {
                         const maxDisplayLength = 23;
-                        const selectors = Array.isArray(appState.excludedSelectors) ? appState.excludedSelectors : ['img', 'i', 'code', 'code *'];
+                        const selectors = Array.isArray(appState.excludedSelectors) ? appState.excludedSelectors : ['i', 'code', 'code *', 'pre', 'pre *', 'svg', 'canvas', 'kbd', 'samp'];
                         const selectorsText = selectors.join(', ');
                         const displayText = selectorsText.length > maxDisplayLength
                             ? selectorsText.substring(0, maxDisplayLength - 3) + '...'
@@ -1067,7 +1216,7 @@
                         UIManager.updateUI();
                         log(`切换到面板类型: ${newPanelType}`);
                     },
-                    displayInPluginPanel: false, 
+                    displayInPluginPanel: false,
                     displayInFloatingPanel: false
                 },
                 {
@@ -1094,6 +1243,17 @@
                 {
                     id: 'export-import-config',
                     getText: () => `📋 ${t.exportImportConfig}`,
+                    getFloatingPanelHtml: () => {
+                        const m = t.exportImportConfig.match(/^([^/]+)\/(.+)$/);
+                        const exportL = m ? m[1].trim() : t.exportLink;
+                        const rest = m ? m[2] : t.importLink + t.exportImportConfigSuffix;
+                        const suffix = t.exportImportConfigSuffix;
+                        const importL = suffix && rest.endsWith(suffix) ? rest.slice(0, -suffix.length).trim() : rest;
+                        const suffixDisplay = suffix && rest.endsWith(suffix) ? suffix : '';
+                        const clearLabel = suffixDisplay || t.clearAllConfigLabel;
+                        const suffixHtml = clearLabel ? `<span class="nf-clear-config">${suffixDisplay ? '' : ' '}${clearLabel}</span>` : '';
+                        return `📋 <span class="nf-export">${exportL}</span>/<span class="nf-import">${importL}</span>${suffixHtml}`;
+                    },
                     action: ConfigManager.exportImportConfig,
                     displayInPluginPanel: true,
                     displayInFloatingPanel: true
@@ -1159,14 +1319,106 @@
                 contentContainer.innerHTML = this.getCommandsConfig()
                     .filter(cmd => cmd.displayInFloatingPanel && (!appState.isExcludedSite || ['currentConfigScope', 'config-scope', 'export-import-config', 'save-config'].includes(cmd.id)))
                     .map(cmd => {
-                        const text = cmd.getText();
-                        return `<div class="action-btn" id="NiceFont_${cmd.id}">${text}</div>`;
+                        const html = cmd.getFloatingPanelHtml ? cmd.getFloatingPanelHtml() : cmd.getText();
+                        return `<div class="action-btn" id="NiceFont_${cmd.id}">${html}</div>`;
                     })
                     .join('');
                 log('面板内容更新成功');
             } else {
                 console.error('[NiceFont] 未找到 .NiceFont_content，无法更新内容');
             }
+        },
+
+        showStrokeSlider() {
+            let wrap = this.panelCache?.shadowRoot?.querySelector('#NiceFont_stroke-slider-wrap');
+            if (wrap) {
+                wrap.remove();
+                document.removeEventListener('click', this.closeDropdown);
+                this.closeDropdown = null;
+                return;
+            }
+            wrap = this.panelCache?.shadowRoot?.querySelector('#NiceFont_shadow-slider-wrap');
+            if (wrap) wrap.remove();
+            const btn = this.panelCache?.shadowRoot?.querySelector('#NiceFont_setTextStroke');
+            if (!btn) return;
+            const row = document.createElement('div');
+            row.id = 'NiceFont_stroke-slider-wrap';
+            row.className = 'slider-row';
+            const range = document.createElement('input');
+            range.type = 'range';
+            range.min = '0';
+            range.max = '1';
+            range.step = '0.05';
+            range.value = appState.textStroke;
+            const span = document.createElement('span');
+            span.textContent = appState.textStroke.toFixed(2);
+            range.addEventListener('input', () => {
+                const v = Math.round(parseFloat(range.value) * 100) / 100;
+                appState.textStroke = v;
+                span.textContent = v.toFixed(2);
+                if (btn.firstChild) btn.firstChild.textContent = `✏️ ${t.setTextStroke}: ${v > 0 ? v.toFixed(2) : t.none}`;
+                FontManager.applyFontRecursively(document.body, appState.currentAdjustment);
+                checkConfigModified();
+                UIManager.updateUI();
+            });
+            row.appendChild(range);
+            row.appendChild(span);
+            btn.appendChild(row);
+            this.closeDropdown = (e) => {
+                if (!row.contains(e.target) && !btn.contains(e.target)) {
+                    row.remove();
+                    document.removeEventListener('click', this.closeDropdown);
+                    this.closeDropdown = null;
+                    UIManager.updatePanelContent();
+                }
+            };
+            document.addEventListener('click', this.closeDropdown);
+        },
+
+        showShadowSlider() {
+            let wrap = this.panelCache?.shadowRoot?.querySelector('#NiceFont_shadow-slider-wrap');
+            if (wrap) {
+                wrap.remove();
+                document.removeEventListener('click', this.closeDropdown);
+                this.closeDropdown = null;
+                return;
+            }
+            wrap = this.panelCache?.shadowRoot?.querySelector('#NiceFont_stroke-slider-wrap');
+            if (wrap) wrap.remove();
+            const btn = this.panelCache?.shadowRoot?.querySelector('#NiceFont_setTextShadow');
+            if (!btn) return;
+            const row = document.createElement('div');
+            row.id = 'NiceFont_shadow-slider-wrap';
+            row.className = 'slider-row';
+            const range = document.createElement('input');
+            range.type = 'range';
+            range.min = '0';
+            range.max = '4';
+            range.step = '0.05';
+            range.value = appState.textShadow;
+            const span = document.createElement('span');
+            span.textContent = appState.textShadow.toFixed(2);
+            range.addEventListener('input', () => {
+                const v = Math.round(parseFloat(range.value) * 100) / 100;
+                appState.textShadow = v;
+                span.textContent = v.toFixed(2);
+                if (btn.firstChild) btn.firstChild.textContent = `🌑 ${t.setTextShadow}: ${v > 0 ? v.toFixed(2) : t.none}`;
+                FontManager.applyFontRecursively(document.body, appState.currentAdjustment);
+                checkConfigModified();
+                UIManager.updateUI();
+            });
+            row.appendChild(range);
+            row.appendChild(span);
+            btn.appendChild(row);
+            this.closeDropdown = (e) => {
+                if (!row.contains(e.target) && !btn.contains(e.target)) {
+                    row.remove();
+                    document.removeEventListener('click', this.closeDropdown);
+                    this.closeDropdown = null;
+                    UIManager.updatePanelContent();
+                }
+            };
+            document.addEventListener('click', this.closeDropdown);
         },
 
         /** 创建浮动面板（custom element + Shadow DOM），可拖拽 */
@@ -1191,6 +1443,10 @@
 
             const scriptName = t.panelTitle;
             const savedPosition = GM_getValue('NiceFont_panelPosition', { top: '50px', right: '20px' });
+            const vpW = window.visualViewport?.width ?? document.documentElement.clientWidth;
+            const panelW = 300;
+            const safeRight = Math.max(0, Math.min(parseFloat(String(savedPosition.right).replace(/px$/, '')) || 20, vpW - panelW));
+            const safeTop = savedPosition.top || '50px';
 
             this.panelCache = document.createElement('nicefont-panel');
             this.panelCache.id = 'NiceFont_panel';
@@ -1201,10 +1457,10 @@
             panelContainer.className = 'NiceFont_panel-container';
             panelContainer.style.cssText = `
                 position: fixed;
-                top: ${savedPosition.top};
-                right: ${savedPosition.right};
+                top: ${safeTop};
+                right: ${safeRight}px;
                 left: auto;
-                width: 300px;
+                width: ${panelW}px;
                 border-radius: 5px;
                 padding: 10px;
                 z-index: 2147483647;
@@ -1279,7 +1535,7 @@
                     color: inherit !important;
                 }
                 .NiceFont_close-btn:hover {
-                    text-decoration: underline;
+                    text-decoration: none;
                 }
                 .action-btn {
                     display: block;
@@ -1293,11 +1549,40 @@
                     background: transparent !important;
                 }
                 .action-btn:hover {
+                    text-decoration: none;
+                }
+                .action-btn .nf-export,
+                .action-btn .nf-import {
+                    color: inherit;
+                    cursor: pointer;
+                    pointer-events: auto;
+                }
+                .action-btn .nf-export:hover,
+                .action-btn .nf-import:hover,
+                .action-btn .nf-clear-config:hover {
                     text-decoration: underline;
+                }
+                .action-btn .nf-clear-config {
+                    cursor: pointer;
+                    pointer-events: auto;
                 }
                 #NiceFont_set-font-size-btn {
                     padding: 2px;
                     text-decoration: none !important;
+                }
+                .slider-row {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 4px 0;
+                }
+                .slider-row input[type="range"] {
+                    flex: 1;
+                    min-width: 80px;
+                }
+                .slider-row span {
+                    font-size: 12px;
+                    min-width: 28px;
                 }
                 .font-family-select {
                     display: inline-block;
@@ -1307,7 +1592,7 @@
                     border: 1px solid #ddd !important;
                     border-radius: 3px;
                     font-size: 14px !important;
-                    font-family: sans-serif !important;
+                    font-family: inherit;
                     color: #333 !important;
                     background: #fff !important;
                     vertical-align: middle;
@@ -1397,13 +1682,23 @@
 
             const getCoords = (e) => (e.touches ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : { x: e.clientX, y: e.clientY });
 
+            const getViewportSize = () => {
+                const vv = window.visualViewport;
+                return vv ? { w: vv.width, h: vv.height } : { w: document.documentElement.clientWidth, h: document.documentElement.clientHeight };
+            };
+
             const onDragStart = (e) => {
                 if (e.target.closest('.NiceFont_close-btn')) return;
                 if (e.type === 'mousedown' && Date.now() - lastTouchEnd < 400) return;
                 const { x, y } = getCoords(e);
+                const rect = panelContainer.getBoundingClientRect();
+                const vp = getViewportSize();
+                const currentLeft = panelContainer.style.left !== 'auto' && panelContainer.style.left
+                    ? parseFloat(panelContainer.style.left) : vp.w - parseFloat(panelContainer.style.right || '0') - rect.width;
+                const currentTop = parseFloat(panelContainer.style.top || '0');
                 isDragging = true;
-                initialX = x + parseFloat(panelContainer.style.right || '0');
-                initialY = y - parseFloat(panelContainer.style.top || '0');
+                initialX = x - currentLeft;
+                initialY = y - currentTop;
                 header.style.cursor = 'grabbing';
                 log('开始拖拽');
                 e.preventDefault();
@@ -1417,13 +1712,14 @@
                 if (rafId) cancelAnimationFrame(rafId);
                 rafId = requestAnimationFrame(() => {
                     const rect = panelContainer.getBoundingClientRect();
-                    let newRight = initialX - x;
+                    const vp = getViewportSize();
+                    let newLeft = x - initialX;
                     let newTop = y - initialY;
-                    newRight = Math.max(0, Math.min(newRight, window.innerWidth - rect.width));
-                    newTop = Math.max(0, Math.min(newTop, window.innerHeight - rect.height));
-                    panelContainer.style.right = `${newRight}px`;
+                    newLeft = Math.max(0, Math.min(newLeft, vp.w - rect.width));
+                    newTop = Math.max(0, Math.min(newTop, vp.h - rect.height));
+                    panelContainer.style.left = `${newLeft}px`;
                     panelContainer.style.top = `${newTop}px`;
-                    panelContainer.style.left = 'auto';
+                    panelContainer.style.right = 'auto';
                 });
             };
 
@@ -1436,9 +1732,13 @@
                     cancelAnimationFrame(rafId);
                     rafId = null;
                 }
+                const vp = getViewportSize();
+                const rect = panelContainer.getBoundingClientRect();
+                const left = parseFloat(panelContainer.style.left || '0');
+                const right = vp.w - left - rect.width;
                 GM_setValue('NiceFont_panelPosition', {
                     top: panelContainer.style.top,
-                    right: panelContainer.style.right
+                    right: `${Math.max(0, right)}px`
                 });
                 log('拖拽结束, 面板位置保存:', panelContainer.style.top, panelContainer.style.right);
                 e.preventDefault();
@@ -1480,6 +1780,24 @@
             shadow.addEventListener('mouseleave', stopLongPress, { capture: false });
 
             shadow.addEventListener('click', (e) => {
+                if (e.target.classList.contains('nf-export')) {
+                    e.preventDefault();
+                    ConfigManager.exportConfig();
+                    log('执行导出配置');
+                    return;
+                }
+                if (e.target.classList.contains('nf-import')) {
+                    e.preventDefault();
+                    ConfigManager.importConfig();
+                    log('执行导入配置');
+                    return;
+                }
+                if (e.target.classList.contains('nf-clear-config')) {
+                    e.preventDefault();
+                    ConfigManager.clearAllConfig();
+                    log('执行清空所有配置');
+                    return;
+                }
                 const btn = e.target.closest('.action-btn');
                 if (btn) {
                     const command = this.getCommandsConfig().find(c => c.id === btn.id.replace('NiceFont_', ''));
@@ -1549,8 +1867,9 @@
                 }
             } else {
                 this.updatePluginPanel();
+                const hasSlider = this.panelCache?.shadowRoot?.querySelector('#NiceFont_stroke-slider-wrap, #NiceFont_shadow-slider-wrap');
                 if (this.panelCache && document.documentElement.contains(this.panelCache)) {
-                    this.updatePanelContent();
+                    if (!hasSlider) this.updatePanelContent();
                 } else {
                     log('panelCache 不存在，等待 togglePanel 创建');
                 }
@@ -1582,7 +1901,7 @@
     function setupScheduledAdjustments() {
         cleanupTimersAndObserver();
         if (appState.isExcludedSite || !document.body) return;
-        if (appState.currentAdjustment === 0 && appState.currentFontFamily === 'none') return;
+        if (appState.currentAdjustment === 0 && appState.currentFontFamily === 'none' && appState.textStroke <= 0 && appState.textShadow <= 0) return;
 
         if (appState.firstAdjustmentTime > 0) {
             setTimeout(() => {
@@ -1597,7 +1916,7 @@
             log(`定时调整启用: ${appState.intervalSeconds}s`);
         }
         if (appState.dynamicAdjustment) {
-            const throttleTime = document.body.childElementCount > 500 ? 250 : 150;
+            const throttleTime = document.body.childElementCount > 500 ? 500 : 300;
             appState.observer = new MutationObserver(Utils.throttle(() => {
                 FontManager.applyFontRecursively(document.body, appState.currentAdjustment);
             }, throttleTime));
@@ -1610,18 +1929,17 @@
     }
 
     // --- 初始化 ---
-    /**
-     * 初始化脚本
-     */
 
-    // ========== 多语言翻译（根据 navigator.language 自动选择，默认回退简体中文）==========
-// --- 多语言支持（根据 navigator.language 自动选择，默认回退到简体中文）---
     /** 多语言文案，按 navigator.language 前缀匹配 */
     const TRANSLATIONS = {
         zh: {
             setFontFamily: '设置字体类型',
             setFontFamilyPrompt: '请输入字体类型（例如：Arial, sans-serif）：',
             supportFontFamily: '支持的字体：',
+            setTextStroke: '字体描边',
+            setTextStrokePrompt: '请输入 0.0-1.0（0 为关闭）：',
+            setTextShadow: '字体阴影',
+            setTextShadowPrompt: '请输入 0.0-4.0（0 为关闭）：',
             fontSizeAdjustment: '字体大小调整',
             increase: '增大字体',
             decrease: '减小字体',
@@ -1641,11 +1959,16 @@
             floatingPanel: '浮动面板',
             autoOpenFloatingPanelPrompt: '在没有调整字体配置的网页上自动弹出设置字体的浮动面板？',
             showPanel: '显示面板',
-            currentConfigScope: '当前配置作用',
-            modifyConfigScope: '修改配置作用',
-            modifyConfigScopePrompt: '请输入配置作用范围：\n0: 排除本站\n1: 子域名 ({hostname})\n2: 顶级域名 ({tld})\n3: 所有网站\n当前范围: {scope}',
-            exportImportConfig: '导出导入配置',
-            exportImportPrompt: '1: 导出配置  2: 导入配置\n请输入 1 或 2:',
+            currentConfigScope: '当前配置范围',
+            modifyConfigScope: '修改配置范围',
+            modifyConfigScopePrompt: '请输入配置范围：\n0: 排除本站\n1: 子域名 ({hostname})\n2: 顶级域名 ({tld})\n3: 所有网站\n当前范围: {scope}',
+            exportImportConfig: '导出/导入配置',
+            clearAllConfigConfirm: '请输入 y 确认清空所有配置：',
+            clearAllConfigLabel: '清空',
+            exportLink: '导出',
+            importLink: '导入',
+            exportImportConfigSuffix: '配置',
+            exportImportPrompt: '1: 导出配置  2: 导入配置  3: 清空配置\n请输入 1、2 或 3:',
             importConfigPreview: '将新增 {add} 项、修改 {modify} 项、删除 {delete} 项配置，是否继续？',
             importConfigSuccess: '配置导入成功！',
             importConfigError: '导入失败，请检查 JSON 格式是否正确。',
@@ -1668,6 +1991,10 @@
             setFontFamily: 'Set Font Family',
             setFontFamilyPrompt: 'Please enter font family (e.g., Arial, sans-serif):',
             supportFontFamily: 'Supported fonts:',
+            setTextStroke: 'Font Stroke',
+            setTextStrokePrompt: 'Enter 0.0-1.0 (0 to disable):',
+            setTextShadow: 'Font Shadow',
+            setTextShadowPrompt: 'Enter 0.0-4.0 (0 to disable):',
             fontSizeAdjustment: 'Font Size Adjustment',
             increase: 'Increase Font',
             decrease: 'Decrease Font',
@@ -1690,8 +2017,13 @@
             currentConfigScope: 'Current Configuration Scope',
             modifyConfigScope: 'Modify Configuration Scope',
             modifyConfigScopePrompt: 'Enter configuration scope:\n0: Exclude this site\n1: Subdomain ({hostname})\n2: Top-Level Domain ({tld})\n3: All Websites\nCurrent scope: {scope}',
-            exportImportConfig: 'Export Import Config',
-            exportImportPrompt: '1: Export config  2: Import config\nEnter 1 or 2:',
+            exportImportConfig: 'Export/Import Config',
+            clearAllConfigConfirm: 'Enter y to confirm clearing all configurations:',
+            clearAllConfigLabel: 'Clear',
+            exportLink: 'Export',
+            importLink: 'Import',
+            exportImportConfigSuffix: ' Config',
+            exportImportPrompt: '1: Export config  2: Import config  3: Clear all config\nEnter 1, 2, or 3:',
             importConfigPreview: 'Add {add}, modify {modify}, delete {delete} config items. Continue?',
             importConfigSuccess: 'Config imported successfully!',
             importConfigError: 'Import failed. Please check if the JSON format is correct.',
@@ -1714,6 +2046,10 @@
             setFontFamily: '글꼴 설정',
             setFontFamilyPrompt: '글꼴을 입력하세요 (예: Arial, sans-serif):',
             supportFontFamily: '지원되는 글꼴:',
+            setTextStroke: '글꼴 테두리',
+            setTextStrokePrompt: '0.0-1.0 입력 (0은 비활성화):',
+            setTextShadow: '글꼴 그림자',
+            setTextShadowPrompt: '0.0-4.0 입력 (0은 비활성화):',
             fontSizeAdjustment: '글꼴 크기 조정',
             increase: '글꼴 크기 증가',
             decrease: '글꼴 크기 감소',
@@ -1736,8 +2072,13 @@
             currentConfigScope: '현재 설정 범위',
             modifyConfigScope: '설정 범위 수정',
             modifyConfigScopePrompt: '설정 범위를 입력하세요:\n0: 이 사이트 제외\n1: 서브도메인 ({hostname})\n2: 최상위 도메인 ({tld})\n3: 모든 웹사이트\n현재 범위: {scope}',
-            exportImportConfig: '설정 내보내기 가져오기',
-            exportImportPrompt: '1: 설정 내보내기  2: 설정 가져오기\n1 또는 2를 입력하세요:',
+            exportImportConfig: '설정 내보내기/가져오기',
+            clearAllConfigConfirm: '초기화하려면 y를 입력하세요:',
+            clearAllConfigLabel: '초기화',
+            exportLink: '내보내기',
+            importLink: '가져오기',
+            exportImportConfigSuffix: '',
+            exportImportPrompt: '1: 설정 내보내기  2: 설정 가져오기  3: 설정 초기화\n1, 2 또는 3을 입력하세요:',
             importConfigPreview: '{add}개 추가, {modify}개 수정, {delete}개 삭제됩니다. 계속하시겠습니까?',
             importConfigSuccess: '설정이 성공적으로 가져와졌습니다!',
             importConfigError: '가져오기 실패. JSON 형식이 올바른지 확인하세요.',
@@ -1760,6 +2101,10 @@
             setFontFamily: 'フォントの設定',
             setFontFamilyPrompt: 'フォントを入力してください（例：Arial, sans-serif）：',
             supportFontFamily: 'サポートされているフォント：',
+            setTextStroke: 'フォント縁取り',
+            setTextStrokePrompt: '0.0-1.0 を入力（0で無効）：',
+            setTextShadow: 'フォントシャドウ',
+            setTextShadowPrompt: '0.0-4.0 を入力（0で無効）：',
             fontSizeAdjustment: 'フォントサイズの調整',
             increase: 'フォントサイズを大きくする',
             decrease: 'フォントサイズを小さくする',
@@ -1782,8 +2127,13 @@
             currentConfigScope: '現在の設定範囲',
             modifyConfigScope: '設定範囲の変更',
             modifyConfigScopePrompt: '設定範囲を入力してください：\n0: このサイトを除外\n1: サブドメイン ({hostname})\n2: トップレベルドメイン ({tld})\n3: すべてのウェブサイト\n現在の範囲: {scope}',
-            exportImportConfig: '設定のエクスポートインポート',
-            exportImportPrompt: '1: 設定をエクスポート  2: 設定をインポート\n1または2を入力してください:',
+            exportImportConfig: '設定のエクスポート/インポート',
+            clearAllConfigConfirm: 'クリアするには y を入力してください:',
+            clearAllConfigLabel: 'クリア',
+            exportLink: 'エクスポート',
+            importLink: 'インポート',
+            exportImportConfigSuffix: '',
+            exportImportPrompt: '1: 設定をエクスポート  2: 設定をインポート  3: 設定をクリア\n1、2または3を入力してください:',
             importConfigPreview: '{add}件追加、{modify}件変更、{delete}件削除されます。続行しますか？',
             importConfigSuccess: '設定のインポートに成功しました！',
             importConfigError: 'インポートに失敗しました。JSON形式が正しいか確認してください。',
@@ -1806,6 +2156,10 @@
             setFontFamily: 'Установить шрифт',
             setFontFamilyPrompt: 'Введите название шрифта (например: Arial, sans-serif):',
             supportFontFamily: 'Поддерживаемые шрифты:',
+            setTextStroke: 'Обводка шрифта',
+            setTextStrokePrompt: 'Введите 0.0-1.0 (0 — выкл.):',
+            setTextShadow: 'Тень шрифта',
+            setTextShadowPrompt: 'Введите 0.0-4.0 (0 — выкл.):',
             fontSizeAdjustment: 'Настройка размера шрифта',
             increase: 'Увеличить шрифт',
             decrease: 'Уменьшить шрифт',
@@ -1828,8 +2182,13 @@
             currentConfigScope: 'Текущая область настроек',
             modifyConfigScope: 'Изменить область настроек',
             modifyConfigScopePrompt: 'Введите область настроек:\n0: Исключить этот сайт\n1: Поддомен ({hostname})\n2: Домен верхнего уровня ({tld})\n3: Все веб-сайты\nТекущая область: {scope}',
-            exportImportConfig: 'Экспорт Импорт настроек',
-            exportImportPrompt: '1: Экспорт настроек  2: Импорт настроек\nВведите 1 или 2:',
+            exportImportConfig: 'Экспорт/Импорт настроек',
+            clearAllConfigConfirm: 'Введите y для подтверждения очистки всех настроек:',
+            clearAllConfigLabel: 'Очистить',
+            exportLink: 'Экспорт',
+            importLink: 'Импорт',
+            exportImportConfigSuffix: ' настроек',
+            exportImportPrompt: '1: Экспорт настроек  2: Импорт настроек  3: Очистить все\nВведите 1, 2 или 3:',
             importConfigPreview: 'Добавить {add}, изменить {modify}, удалить {delete}. Продолжить?',
             importConfigSuccess: 'Настройки успешно импортированы!',
             importConfigError: 'Ошибка импорта. Проверьте формат JSON.',
@@ -1852,6 +2211,10 @@
             setFontFamily: 'Définir la famille de polices',
             setFontFamilyPrompt: 'Veuillez entrer la famille de polices (par exemple : Arial, sans-serif) :',
             supportFontFamily: 'Polices prises en charge :',
+            setTextStroke: 'Contour de police',
+            setTextStrokePrompt: 'Entrez 0.0-1.0 (0 pour désactiver) :',
+            setTextShadow: 'Ombre de police',
+            setTextShadowPrompt: 'Entrez 0.0-4.0 (0 pour désactiver) :',
             fontSizeAdjustment: 'Ajustement de la taille de la police',
             increase: 'Augmenter la police',
             decrease: 'Réduire la police',
@@ -1874,8 +2237,13 @@
             currentConfigScope: 'Portée actuelle de la configuration',
             modifyConfigScope: 'Modifier la portée de la configuration',
             modifyConfigScopePrompt: 'Entrez la portée de la configuration :\n0 : Exclure ce site\n1 : Sous-domaine ({hostname})\n2 : Domaine de premier niveau ({tld})\n3 : Tous les sites web\nPortée actuelle : {scope}',
-            exportImportConfig: 'Exporter Importer la config',
-            exportImportPrompt: '1: Exporter  2: Importer\nEntrez 1 ou 2:',
+            exportImportConfig: 'Exporter/Importer la config',
+            clearAllConfigConfirm: 'Entrez y pour confirmer l\'effacement de toutes les configurations :',
+            clearAllConfigLabel: 'Effacer',
+            exportLink: 'Exporter',
+            importLink: 'Importer',
+            exportImportConfigSuffix: ' la config',
+            exportImportPrompt: '1: Exporter  2: Importer  3: Tout effacer\nEntrez 1, 2 ou 3:',
             importConfigPreview: 'Ajouter {add}, modifier {modify}, supprimer {delete}. Continuer ?',
             importConfigSuccess: 'Configuration importée avec succès !',
             importConfigError: 'Échec de l\'import. Vérifiez le format JSON.',
@@ -1898,6 +2266,10 @@
             setFontFamily: 'Schriftart einstellen',
             setFontFamilyPrompt: 'Bitte geben Sie die Schriftart ein (z. B. Arial, sans-serif):',
             supportFontFamily: 'Unterstützte Schriftarten:',
+            setTextStroke: 'Schriftkontur',
+            setTextStrokePrompt: '0.0-1.0 eingeben (0 = aus):',
+            setTextShadow: 'Schriftschatten',
+            setTextShadowPrompt: '0.0-4.0 eingeben (0 = aus):',
             fontSizeAdjustment: 'Schriftgrößenanpassung',
             increase: 'Schrift vergrößern',
             decrease: 'Schrift verkleinern',
@@ -1920,8 +2292,13 @@
             currentConfigScope: 'Aktueller Konfigurationsbereich',
             modifyConfigScope: 'Konfigurationsbereich ändern',
             modifyConfigScopePrompt: 'Geben Sie den Konfigurationsbereich ein:\n0: Diesen Standort ausschließen\n1: Subdomain ({hostname})\n2: Top-Level-Domain ({tld})\n3: Alle Websites\nAktueller Bereich: {scope}',
-            exportImportConfig: 'Konfiguration exportieren importieren',
-            exportImportPrompt: '1: Exportieren  2: Importieren\n1 oder 2 eingeben:',
+            exportImportConfig: 'Konfiguration exportieren/importieren',
+            clearAllConfigConfirm: 'Geben Sie y ein, um alle Konfigurationen zu löschen:',
+            clearAllConfigLabel: 'Löschen',
+            exportLink: 'Exportieren',
+            importLink: 'Importieren',
+            exportImportConfigSuffix: '',
+            exportImportPrompt: '1: Exportieren  2: Importieren  3: Alles löschen\n1, 2 oder 3 eingeben:',
             importConfigPreview: '{add} hinzufügen, {modify} ändern, {delete} löschen. Fortfahren?',
             importConfigSuccess: 'Konfiguration erfolgreich importiert!',
             importConfigError: 'Import fehlgeschlagen. JSON-Format prüfen.',
@@ -1944,6 +2321,10 @@
             setFontFamily: 'Establecer familia de fuentes',
             setFontFamilyPrompt: 'Por favor, introduce la familia de fuentes (por ejemplo: Arial, sans-serif):',
             supportFontFamily: 'Fuentes soportadas:',
+            setTextStroke: 'Contorno de fuente',
+            setTextStrokePrompt: 'Introduce 0.0-1.0 (0 para desactivar):',
+            setTextShadow: 'Sombra de fuente',
+            setTextShadowPrompt: 'Introduce 0.0-4.0 (0 para desactivar):',
             fontSizeAdjustment: 'Ajuste del tamaño de la fuente',
             increase: 'Aumentar fuente',
             decrease: 'Reducir fuente',
@@ -1966,8 +2347,13 @@
             currentConfigScope: 'Alcance actual de la configuración',
             modifyConfigScope: 'Modificar alcance de la configuración',
             modifyConfigScopePrompt: 'Introduce el alcance de la configuración:\n0: Excluir este sitio\n1: Subdominio ({hostname})\n2: Dominio de primer nivel ({tld})\n3: Todos los sitios web\nAlcance actual: {scope}',
-            exportImportConfig: 'Exportar Importar configuración',
-            exportImportPrompt: '1: Exportar  2: Importar\nIntroduce 1 o 2:',
+            exportImportConfig: 'Exportar/Importar configuración',
+            clearAllConfigConfirm: 'Introduzca y para confirmar el borrado de todas las configuraciones:',
+            clearAllConfigLabel: 'Borrar',
+            exportLink: 'Exportar',
+            importLink: 'Importar',
+            exportImportConfigSuffix: ' configuración',
+            exportImportPrompt: '1: Exportar  2: Importar  3: Borrar todo\nIntroduce 1, 2 o 3:',
             importConfigPreview: 'Añadir {add}, modificar {modify}, eliminar {delete}. ¿Continuar?',
             importConfigSuccess: '¡Configuración importada correctamente!',
             importConfigError: 'Error al importar. Comprueba el formato JSON.',
@@ -1990,6 +2376,10 @@
             setFontFamily: 'Definir família de fontes',
             setFontFamilyPrompt: 'Por favor, insira a família de fontes (por exemplo: Arial, sans-serif):',
             supportFontFamily: 'Fontes suportadas:',
+            setTextStroke: 'Contorno da fonte',
+            setTextStrokePrompt: 'Insira 0.0-1.0 (0 para desativar):',
+            setTextShadow: 'Sombra da fonte',
+            setTextShadowPrompt: 'Insira 0.0-4.0 (0 para desativar):',
             fontSizeAdjustment: 'Ajuste do tamanho da fonte',
             increase: 'Aumentar fonte',
             decrease: 'Diminuir fonte',
@@ -2012,8 +2402,13 @@
             currentConfigScope: 'Escopo atual da configuração',
             modifyConfigScope: 'Modificar escopo da configuração',
             modifyConfigScopePrompt: 'Insira o escopo da configuração:\n0: Excluir este site\n1: Subdomínio ({hostname})\n2: Domínio de nível superior ({tld})\n3: Todos os sites\nEscopo atual: {scope}',
-            exportImportConfig: 'Exportar Importar configuração',
-            exportImportPrompt: '1: Exportar  2: Importar\nDigite 1 ou 2:',
+            exportImportConfig: 'Exportar/Importar configuração',
+            clearAllConfigConfirm: 'Digite y para confirmar a limpeza de todas as configurações:',
+            clearAllConfigLabel: 'Limpar',
+            exportLink: 'Exportar',
+            importLink: 'Importar',
+            exportImportConfigSuffix: ' configuração',
+            exportImportPrompt: '1: Exportar  2: Importar  3: Limpar tudo\nDigite 1, 2 ou 3:',
             importConfigPreview: 'Adicionar {add}, modificar {modify}, excluir {delete}. Continuar?',
             importConfigSuccess: 'Configuração importada com sucesso!',
             importConfigError: 'Falha ao importar. Verifique o formato JSON.',

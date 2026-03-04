@@ -37,7 +37,7 @@ If you like this plugin, please give our GitHub project [NiceFont](https://githu
 - **🌐 Multi-Language Support**: Menu supports 9 languages and automatically switches based on browser language.
 - **🚫 Exclude Elements**: Exclude custom CSS selectors and webpage elements.
 - **📍 Current Configuration Scope**: Supports excluding sites or matching subdomains, top-level domains, and all websites for font adjustments (click to delete corresponding configurations as needed).
-- **📋 Export Import Config**: Export all configurations as a JSON file for quick restore on a new computer.
+- **📋 Export/Import Config**: Export all configurations as a JSON file for quick restore on a new computer.
 - **💾 Save Configuration**: Persistently save font adjustment configurations locally, remaining effective upon reopening pages.
 
 ## 🚀 Installation Steps
@@ -48,6 +48,18 @@ If you like this plugin, please give our GitHub project [NiceFont](https://githu
 4. Refresh any webpage, click the extension tool's menu, then open the NiceFont menu to customize fonts 🔠.
 
 ## 📜 Changelog
+
+### v4.2.0 - 2026-03-05
+
+- **New Features**:
+  - Added "Font Stroke" and "Font Shadow": Adjust text stroke and shadow strength for clearer, more layered fonts; configurations can be saved.
+
+### v4.1.4 - 2026-03-05
+
+- **Improvements**:
+  - Dynamic adjustment throttling: Increased to 300–500ms on complex pages to reduce performance overhead.
+  - Export config now prefers GM_download for more reliable downloads.
+  - Default exclusions extended with svg, canvas, kbd, samp to reduce impact on icons and code samples.
 
 ### v4.1.3 - 2026-03-05
 
@@ -69,7 +81,7 @@ If you like this plugin, please give our GitHub project [NiceFont](https://githu
 
 - **New Features**:
   - Added "Switch Panel": Use floating panel for a cleaner Tampermonkey menu; smart popup on sites without font configuration.
-  - Added "Export Import Config": Export all configurations as a JSON file for quick restore on a new computer.
+  - Added "Export/Import Config": Export all configurations as a JSON file for quick restore on a new computer.
 - **Improvements**:
   - Code optimization and improved comments.
 - **Fixes**:
