@@ -10,7 +10,7 @@
 // @name:de       NiceFont (Schöne Schrift)
 // @name:es       NiceFont (Fuente agradable)
 // @name:pt       NiceFont (Fonte agradável)
-// @version      4.1.2
+// @version      4.1.3
 // @author       DD1024z
 // @description  NiceFont: 是一款优化网页字体显示的工具，让浏览更清晰、舒适！“真正调整字体，而非页面缩放，拒绝将就”！可直接修改网页的字体大小与风格，保存你的字体设置，轻松应用到每个网页，支持首次、定时或动态调整字体，适配子域名、整站或全局设置，几乎兼容所有网站！
 // @description:zh-CN  NiceFont: 是一款优化网页字体显示的工具，让浏览更清晰、舒适！“真正调整字体，而非页面缩放，拒绝将就”！可直接修改网页的字体大小与风格，保存你的字体设置，轻松应用到每个网页，支持首次、定时或动态调整字体，适配子域名、整站或全局设置，几乎兼容所有网站！
@@ -522,7 +522,7 @@
             const data = {};
             keys.forEach(k => { data[k] = GM_getValue(k, null); });
             const json = JSON.stringify({
-                version: GM_info?.script?.version || '4.1.2',
+                version: GM_info?.script?.version || '4.1.3',
                 exportedAt: new Date().toISOString(),
                 data
             }, null, 2);
@@ -1393,11 +1393,13 @@
             let initialX;
             let initialY;
             let rafId = null;
+            let lastTouchEnd = 0;
 
             const getCoords = (e) => (e.touches ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : { x: e.clientX, y: e.clientY });
 
             const onDragStart = (e) => {
                 if (e.target.closest('.NiceFont_close-btn')) return;
+                if (e.type === 'mousedown' && Date.now() - lastTouchEnd < 400) return;
                 const { x, y } = getCoords(e);
                 isDragging = true;
                 initialX = x + parseFloat(panelContainer.style.right || '0');
@@ -1415,18 +1417,19 @@
                 if (rafId) cancelAnimationFrame(rafId);
                 rafId = requestAnimationFrame(() => {
                     const rect = panelContainer.getBoundingClientRect();
-                    let newX = initialX - x + window.scrollX;
-                    let newY = y - initialY + window.scrollY;
-                    newX = Math.max(0, Math.min(newX, window.innerWidth - rect.width));
-                    newY = Math.max(0, Math.min(newY, window.innerHeight - rect.height));
-                    panelContainer.style.right = `${newX}px`;
-                    panelContainer.style.top = `${newY}px`;
+                    let newRight = initialX - x;
+                    let newTop = y - initialY;
+                    newRight = Math.max(0, Math.min(newRight, window.innerWidth - rect.width));
+                    newTop = Math.max(0, Math.min(newTop, window.innerHeight - rect.height));
+                    panelContainer.style.right = `${newRight}px`;
+                    panelContainer.style.top = `${newTop}px`;
                     panelContainer.style.left = 'auto';
                 });
             };
 
             const onDragEnd = (e) => {
                 if (!isDragging) return;
+                if (e.type === 'touchend' || e.type === 'touchcancel') lastTouchEnd = Date.now();
                 isDragging = false;
                 header.style.cursor = 'grab';
                 if (rafId) {

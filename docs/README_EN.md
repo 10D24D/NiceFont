@@ -49,6 +49,11 @@ If you like this plugin, please give our GitHub project [NiceFont](https://githu
 
 ## 📜 Changelog
 
+### v4.1.3 - 2026-03-05
+
+- **Fixes**:
+  - Fixed floating panel position misalignment when dragging on desktop.
+
 ### v4.1.2 - 2026-03-05
 
 - **Improvements**:
