@@ -49,6 +49,11 @@ If you like this plugin, please give our GitHub project [NiceFont](https://githu
 
 ## 📜 Changelog
 
+### v4.1.2 - 2026-03-05
+
+- **Improvements**:
+  - Floating panel supports touch drag: Mobile users can long-press the header to drag and move the panel.
+
 ### v4.1.1 - 2026-03-05
 
 - **Improvements**:

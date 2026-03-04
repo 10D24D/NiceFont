@@ -10,7 +10,7 @@
 // @name:de       NiceFont (Schöne Schrift)
 // @name:es       NiceFont (Fuente agradable)
 // @name:pt       NiceFont (Fonte agradável)
-// @version      4.1.1
+// @version      4.1.2
 // @author       DD1024z
 // @description  NiceFont: 是一款优化网页字体显示的工具，让浏览更清晰、舒适！“真正调整字体，而非页面缩放，拒绝将就”！可直接修改网页的字体大小与风格，保存你的字体设置，轻松应用到每个网页，支持首次、定时或动态调整字体，适配子域名、整站或全局设置，几乎兼容所有网站！
 // @description:zh-CN  NiceFont: 是一款优化网页字体显示的工具，让浏览更清晰、舒适！“真正调整字体，而非页面缩放，拒绝将就”！可直接修改网页的字体大小与风格，保存你的字体设置，轻松应用到每个网页，支持首次、定时或动态调整字体，适配子域名、整站或全局设置，几乎兼容所有网站！
@@ -522,7 +522,7 @@
             const data = {};
             keys.forEach(k => { data[k] = GM_getValue(k, null); });
             const json = JSON.stringify({
-                version: GM_info?.script?.version || '4.1.1',
+                version: GM_info?.script?.version || '4.1.2',
                 exportedAt: new Date().toISOString(),
                 data
             }, null, 2);
@@ -1257,6 +1257,9 @@
                         box-shadow: 0 2px 10px rgba(0,0,0,0.5);
                     }
                 }
+                .NiceFont_header {
+                    touch-action: none;
+                }
                 .NiceFont_header-left {
                     cursor: grab;
                 }
@@ -1391,50 +1394,61 @@
             let initialY;
             let rafId = null;
 
-            header.addEventListener('mousedown', (e) => {
-                if (e.target.classList.contains('NiceFont_close-btn')) return;
+            const getCoords = (e) => (e.touches ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : { x: e.clientX, y: e.clientY });
+
+            const onDragStart = (e) => {
+                if (e.target.closest('.NiceFont_close-btn')) return;
+                const { x, y } = getCoords(e);
                 isDragging = true;
-                initialX = e.clientX + parseFloat(panelContainer.style.right || '0');
-                initialY = e.clientY - parseFloat(panelContainer.style.top || '0');
+                initialX = x + parseFloat(panelContainer.style.right || '0');
+                initialY = y - parseFloat(panelContainer.style.top || '0');
                 header.style.cursor = 'grabbing';
                 log('开始拖拽');
                 e.preventDefault();
                 e.stopPropagation();
-            }, { capture: true, passive: false });
+            };
 
-            document.addEventListener('mousemove', (e) => {
-                if (isDragging) {
-                    e.preventDefault();
-                    if (rafId) cancelAnimationFrame(rafId);
-                    rafId = requestAnimationFrame(() => {
-                        const rect = panelContainer.getBoundingClientRect();
-                        let newX = initialX - e.clientX + window.scrollX;
-                        let newY = e.clientY - initialY + window.scrollY;
-                        newX = Math.max(0, Math.min(newX, window.innerWidth - rect.width));
-                        newY = Math.max(0, Math.min(newY, window.innerHeight - rect.height));
-                        panelContainer.style.right = `${newX}px`;
-                        panelContainer.style.top = `${newY}px`;
-                        panelContainer.style.left = 'auto';
-                    });
-                }
-            }, { capture: true, passive: false });
+            const onDragMove = (e) => {
+                if (!isDragging) return;
+                const { x, y } = getCoords(e);
+                e.preventDefault();
+                if (rafId) cancelAnimationFrame(rafId);
+                rafId = requestAnimationFrame(() => {
+                    const rect = panelContainer.getBoundingClientRect();
+                    let newX = initialX - x + window.scrollX;
+                    let newY = y - initialY + window.scrollY;
+                    newX = Math.max(0, Math.min(newX, window.innerWidth - rect.width));
+                    newY = Math.max(0, Math.min(newY, window.innerHeight - rect.height));
+                    panelContainer.style.right = `${newX}px`;
+                    panelContainer.style.top = `${newY}px`;
+                    panelContainer.style.left = 'auto';
+                });
+            };
 
-            document.addEventListener('mouseup', (e) => {
-                if (isDragging) {
-                    isDragging = false;
-                    header.style.cursor = 'grab';
-                    if (rafId) {
-                        cancelAnimationFrame(rafId);
-                        rafId = null;
-                    }
-                    GM_setValue('NiceFont_panelPosition', {
-                        top: panelContainer.style.top,
-                        right: panelContainer.style.right
-                    });
-                    log('拖拽结束, 面板位置保存:', panelContainer.style.top, panelContainer.style.right);
-                    e.stopPropagation();
+            const onDragEnd = (e) => {
+                if (!isDragging) return;
+                isDragging = false;
+                header.style.cursor = 'grab';
+                if (rafId) {
+                    cancelAnimationFrame(rafId);
+                    rafId = null;
                 }
-            }, { capture: true, passive: false });
+                GM_setValue('NiceFont_panelPosition', {
+                    top: panelContainer.style.top,
+                    right: panelContainer.style.right
+                });
+                log('拖拽结束, 面板位置保存:', panelContainer.style.top, panelContainer.style.right);
+                e.preventDefault();
+                e.stopPropagation();
+            };
+
+            header.addEventListener('mousedown', onDragStart, { capture: true, passive: false });
+            header.addEventListener('touchstart', onDragStart, { capture: true, passive: false });
+            document.addEventListener('mousemove', onDragMove, { capture: true, passive: false });
+            document.addEventListener('touchmove', onDragMove, { capture: true, passive: false });
+            document.addEventListener('mouseup', onDragEnd, { capture: true, passive: false });
+            document.addEventListener('touchend', onDragEnd, { capture: true, passive: false });
+            document.addEventListener('touchcancel', onDragEnd, { capture: true, passive: false });
 
             let longPressTimer = null;
             const startLongPress = (action, interval = 100) => {
