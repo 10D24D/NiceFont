@@ -48,6 +48,16 @@
 
 ## 📜 更新日志
 
+### v4.3.0 - 2026-03-24
+
+- **新功能**：
+  - 新增本地文件支持：增加 `file://*/*` 匹配规则，可直接在本地 HTML 文件中使用 NiceFont。
+- **改进**：
+  - 字体应用策略升级为「class 分档 + 内联混合覆盖」：在保留效果的同时，降低对页面原有样式的干扰。
+  - 增强 `contenteditable + placeholder` 场景兼容性：优化伪元素占位符字号处理，减少异常放大/缩小问题。
+  - 优化面板切换行为：切换到浮动面板时会直接打开一次，操作更直观。
+  - 移除调试日志输出，减少控制台噪音。
+
 ### v4.2.0 - 2026-03-05
 
 - **新功能**：
@@ -159,6 +169,13 @@
   几乎兼容所有网站，包括哔哩哔哩B站的评论区、钉钉在线文档、知乎等，支持 iframe 和 Shadow DOM 内容。
 - **如何自定义字体？**  
   在菜单中选择“设置字体类型”，可从内置字体（如 Arial、仿宋）中选择，或输入自定义字体名称。也可以选择“auto”模式，然后在浏览器配置中修改全局字体。
+- **如何使用“排除元素”功能？**  
+  不希望被调整的区域（如代码块、工具栏）可加到“排除元素”。简单 3 步：右键目标区域 -> 检查（Inspect）-> 复制选择器（Copy selector），再粘贴到 NiceFont 保存。  
+  示例：复制出来可能是 `#app > div.layout > main > div.editor-wrap > div.toolbar > button:nth-child(3)`，通常可简化为 `.toolbar` 或 `button`。简化后更稳，但范围更大。建议优先用 `.toolbar` 这类 class 选择器。  
+  常见规则：`.hljs, pre, code`、`svg, canvas`、`[contenteditable="true"]`。若需恢复，在“当前配置范围”删除对应规则即可。
+- **首次调整、定时调整、动态调整该怎么选？**  
+  一般按网页变化频率选择：页面基本不变时用“首次调整”；页面会分批加载但变化不频繁时用“定时调整”；评论流、聊天、在线文档这类持续变化页面用“动态调整”。  
+  如果你不确定，建议先开“首次调整”，不够再加“定时调整”，最后才用“动态调整”（实时性最好，但性能开销也最大）。
 - **遇到问题怎么办？**  
   请在 [GitHub Issues](https://github.com/10D24D/NiceFont/issues) 或 [Greasyfork Feedback](https://greasyfork.org/zh-CN/scripts/533232-nicefont/feedback) 提交反馈，我们会尽快解决！
 
@@ -176,3 +193,20 @@ NiceFont 遵循 [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0
 ## ⚠️ 免责声明
 
 NiceFont 是一个免费的开源项目。使用本脚本即表示你同意承担相关风险。开发者不对因使用脚本导致的任何问题或损失负责。
+
+## ☕请作者喝杯咖啡 
+
+如果这个项目对你有所帮助，欢迎请作者喝杯咖啡，你的支持是持续开发的最大动力，感谢每一位愿意打赏的朋友！
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="static/wxpay.jpg" width="180"/><br/>
+      <sub>微信支付</sub>
+    </td>
+    <td align="center">
+      <img src="static/alipay.jpg" width="180"/><br/>
+      <sub>支付宝</sub>
+    </td>
+  </tr>
+</table>

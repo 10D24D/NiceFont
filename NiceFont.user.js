@@ -10,7 +10,7 @@
 // @name:de       NiceFont (Schöne Schrift)
 // @name:es       NiceFont (Fuente agradable)
 // @name:pt       NiceFont (Fonte agradável)
-// @version      4.2.0
+// @version      4.3.0
 // @author       DD1024z
 // @description  NiceFont: 是一款优化网页字体显示的工具，让浏览更清晰、舒适！“真正调整字体，而非页面缩放，拒绝将就”！可直接修改网页的字体大小与风格，保存你的字体设置，轻松应用到每个网页，支持首次、定时或动态调整字体，适配子域名、整站或全局设置，几乎兼容所有网站！
 // @description:zh-TW  NiceFont：優化網頁字體顯示的工具，瀏覽更清晰、舒適！「真正調整字體，非頁面縮放，拒絕將就」！直接修改字體大小與風格，儲存設定，輕鬆應用於各網頁，支援首次、定時或動態調整，適配子域名或全局設定，幾乎相容所有網站！
@@ -26,6 +26,7 @@
 // @namespace    https://github.com/10D24D/NiceFont/
 // @icon         https://raw.githubusercontent.com/10D24D/NiceFont/main/static/logo.png
 // @match        *://*/*
+// @match        file://*/*
 // @license      Apache License 2.0
 // @grant        GM_registerMenuCommand
 // @grant        GM_unregisterMenuCommand
@@ -60,9 +61,6 @@
         return;
     }
 
-    // 调试开关，生产环境中禁用日志
-    const enableLogging = false;
-
     /** 常量：存储键、默认值等 */
     const Constants = {
         DEFAULT_FONT_SIZE: 16,
@@ -73,16 +71,6 @@
         EXCLUDED_KEY: 'NiceFont_excluded',
         PANEL_TYPE_KEY: 'NiceFont_panelType',
     };
-
-    /**
-     * 自定义日志函数，仅在调试模式下输出
-     * @param {...any} args - 日志参数
-     */
-    function log(...args) {
-        if (enableLogging) {
-            console.log('[NiceFont]', ...args);
-        }
-    }
 
     // --- 工具函数模块 ---
     const Utils = {
@@ -315,7 +303,6 @@
                 target = t.allWebsites;
                 GM_setValue(key, {});
             }
-            log(`删除配置: ${target}`);
             return true;
         }
     };
@@ -341,7 +328,6 @@
                 appState.excludedSelectors = ['i', 'code', 'code *', 'pre', 'pre *', 'svg', 'canvas', 'kbd', 'samp'];
                 appState.targetScope = 0;
                 updateSavedSnapshot();
-                log('加载排除站点配置');
                 return;
             }
 
@@ -375,9 +361,6 @@
             appState.targetScope = [0, 1, 2, 3].includes(effectiveScope) ? effectiveScope : 1;
 
             updateSavedSnapshot();
-            if (enableLogging) {
-                log('加载配置:', ConfigScopeManager.getScopeText(effectiveScope), configKey);
-            }
         },
 
         /** 保存当前 appState 到指定范围，需用户确认 */
@@ -418,7 +401,6 @@
                     appState.intervalSeconds = 0;
                     appState.firstAdjustmentTime = 0;
                     FontManager.restoreFont(document.body);
-                    log(`保存排除站点配置: ${target}`);
                 } else {
                     const config = {
                         increment: appState.fontIncrement,
@@ -433,7 +415,6 @@
                     };
                     GM_setValue(key, config);
                     appState.isExcludedSite = false;
-                    log(`保存配置到: ${target} (scope=${scope}, key=${key})`);
                 }
 
                 appState.isConfigModified = false;
@@ -442,8 +423,6 @@
                 ConfigManager.loadConfig();
                 setupScheduledAdjustments();
                 UIManager.updateUI();
-            } else {
-                log('用户取消保存配置');
             }
         },
 
@@ -464,7 +443,6 @@
                 return;
             }
             if (newScope === effectiveScope) {
-                log(`新范围与当前范围相同: ${ConfigScopeManager.scopeMap[newScope]}`);
                 return;
             }
             ConfigScopeManager.initKeys();
@@ -483,14 +461,12 @@
                     appState.targetScope = newScope;
                     checkConfigModified();
                     UIManager.updateUI();
-                    log(`标记范围更改为: ${ConfigScopeManager.scopeMap[newScope]}`);
                 }
             } else {
                 appState.pendingScopeChange = newScope;
                 appState.targetScope = newScope;
                 checkConfigModified();
                 UIManager.updateUI();
-                log(`标记范围更改为: ${ConfigScopeManager.scopeMap[newScope]}`);
             }
         },
 
@@ -501,7 +477,6 @@
             const target = ConfigScopeManager.getCurrentConfigText();
 
             if (target === t.notConfigured) {
-                log('无配置可删除');
                 return false;
             }
 
@@ -518,7 +493,6 @@
                 ConfigManager.loadConfig();
                 setupScheduledAdjustments();
                 UIManager.updateUI();
-                log('配置已删除，targetScope 设置为 1');
                 return true;
             }
             return false;
@@ -540,7 +514,6 @@
                 const blobUrl = URL.createObjectURL(blob);
                 GM_download({ url: blobUrl, name: filename, saveAs: true });
                 setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
-                log('配置已导出 (GM_download)');
             } else {
                 const blob = new Blob([json], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
@@ -552,7 +525,6 @@
                 a.click();
                 document.body.removeChild(a);
                 setTimeout(() => URL.revokeObjectURL(url), 100);
-                log('配置已导出 (anchor)');
             }
         },
 
@@ -593,7 +565,6 @@
                         setupScheduledAdjustments();
                         UIManager.updateUI();
                         alert(t.importConfigSuccess);
-                        log('配置已导入');
                     } catch (e) {
                         console.error('[NiceFont] 导入失败:', e);
                         alert(t.importConfigError);
@@ -626,7 +597,6 @@
             setupScheduledAdjustments();
             UIManager.updateUI();
             FontManager.restoreFont(document.body);
-            log('已清空所有配置');
         },
 
         /** 导出/导入入口：prompt 选择 1、2 或 3（插件面板时支持 3 清空） */
@@ -658,16 +628,13 @@
                     const fonts = await window.queryLocalFonts();
                     const families = [...new Set(fonts.map(f => f.family).filter(Boolean))].sort();
                     this.systemFontsCache = families;
-                    log(`已获取 ${families.length} 个系统字体`);
                     return families;
                 } catch (e) {
-                    log('获取系统字体失败:', e);
                 }
             }
             const pageFonts = this.getFontsFromPage();
             if (pageFonts.length > 0) {
                 this.systemFontsCache = [...new Set([...this.systemFontsCache, ...pageFonts])].sort();
-                log(`已获取 ${pageFonts.length} 个页面字体`);
             }
             return this.systemFontsCache;
         },
@@ -711,7 +678,6 @@
                 }
             }
             appState.excludedSelectors = uniqueSelectors;
-            log(`更新排除选择器: ${uniqueSelectors.join(', ')}`);
             return true;
         },
 
@@ -737,13 +703,175 @@
         /** 阴影数值转 CSS */
         getShadowCSS(v) { return v > 0 ? `1px 1px ${v}px #7C7C7CDD` : ''; },
 
+        /** 根据基础字号生成 class 名（四舍五入取整，如 16.3 -> s16） */
+        getSizeClassBase(basePx) {
+            const n = Math.round(basePx);
+            return Math.max(8, Math.min(96, n));  // 限制 8-96
+        },
+
+        /** 从已有 class 模式类名解析基准字号（px），无则 null */
+        parseNicefontSizeClassBase(node) {
+            for (const c of node.classList) {
+                const m = /^nicefont-s(\d+)$/.exec(c);
+                if (m) {
+                    const n = parseInt(m[1], 10);
+                    if (n >= 8 && n <= 96) return n;
+                }
+            }
+            return null;
+        },
+
+        /**
+         * 解析用于调整字号的基准 px：优先 data-fontsize-default-fontsize，其次 nicefont-sN，最后当前计算字号
+         * class 模式不写 data 属性，复用已挂上的 nicefont-sN 作为基准，避免把已叠加 adjustment 的 computed 当成新基准
+         */
+        getEffectiveBaseFontSizePx(node, style) {
+            const attr = node.getAttribute('data-fontsize-default-fontsize');
+            if (attr) {
+                const px = parseFloat(Utils.convertToPx(node, attr));
+                return isNaN(px) ? null : px;
+            }
+            const fromClass = this.parseNicefontSizeClassBase(node);
+            if (fromClass != null) return fromClass;
+            const current = node.style.fontSize || style.fontSize;
+            if (!current || current === '0px') return null;
+            const px = parseFloat(Utils.convertToPx(node, current));
+            return isNaN(px) ? null : px;
+        },
+
+        /**
+         * 切换渲染方式或重新应用前：去掉 class 档位类；若有 data-nicefont-restore-style 则整段还原为首次记录时的 style 属性，否则按旧逻辑逐条去掉 !important
+         */
+        stripNodeNiceFontArtifacts(node) {
+            node.classList.remove('nicefont-applied');
+            for (const c of [...node.classList]) {
+                if (/^nicefont-s\d+$/.test(c)) node.classList.remove(c);
+            }
+            const saved = node.getAttribute('data-nicefont-restore-style');
+            if (saved !== null) {
+                if (saved === '') {
+                    node.removeAttribute('style');
+                } else {
+                    node.setAttribute('style', saved);
+                }
+            } else {
+                for (const p of ['font-family', '-webkit-text-stroke', 'text-stroke', 'text-shadow']) {
+                    if (node.style.getPropertyPriority(p) === 'important') {
+                        node.style.removeProperty(p);
+                    }
+                }
+                if (node.style.getPropertyPriority('font-size') === 'important') {
+                    node.style.removeProperty('font-size');
+                    const def = node.getAttribute('data-fontsize-default-fontsize');
+                    if (def) node.style.fontSize = def;
+                }
+            }
+        },
+
+        /** 获取或创建全局样式元素，用于 root/class 模式；置于 head 末尾以提高层叠优先级 */
+        getOrCreateGlobalStyle(doc) {
+            const root = doc.documentElement || doc;
+            if (root.nodeType !== Node.ELEMENT_NODE) return null;
+            let el = doc.getElementById?.('NiceFont-global-styles') || root.querySelector?.('#NiceFont-global-styles');
+            const parent = doc.head || root;
+            if (!el) {
+                el = doc.createElement('style');
+                el.id = 'NiceFont-global-styles';
+                parent.appendChild(el);
+            } else if (el.parentNode) {
+                parent.appendChild(el);
+            }
+            return el;
+        },
+
+        /**
+         * contenteditable + 非标准 placeholder：伪元素占位符基准字号（如百度文库 ::after 14px）
+         * 首次用 getComputedStyle(::after) 反推基准（减去当前 adjustment，避免已套用 calc 时存大）
+         */
+        syncContentEditablePlaceholderBase(node) {
+            if (node.nodeType !== Node.ELEMENT_NODE) return;
+            if (node.getAttribute('contenteditable') !== 'true' || !node.hasAttribute('placeholder')) return;
+            // 仅首次采样并固定基数，避免后续重复计算导致漂移
+            let basePx = parseFloat(node.getAttribute('data-nicefont-placeholder-base'), 10);
+            if (!basePx || isNaN(basePx) || basePx <= 0) {
+                basePx = 14;
+                try {
+                    node.setAttribute('data-nicefont-ph-syncing', '1');
+                    const afterPx = parseFloat(window.getComputedStyle(node, '::after').fontSize);
+                    const beforePx = parseFloat(window.getComputedStyle(node, '::before').fontSize);
+                    const elPx = parseFloat(window.getComputedStyle(node).fontSize);
+                    const raw = afterPx || beforePx || elPx || 14;
+                    let b = raw;
+                    if (b < 8 || b > 96) b = raw;
+                    basePx = Math.round(b * 100) / 100;
+                    if (basePx < 1) basePx = 14;
+                } catch (e) {
+                    basePx = 14;
+                } finally {
+                    node.removeAttribute('data-nicefont-ph-syncing');
+                }
+                node.setAttribute('data-nicefont-placeholder-base', String(basePx));
+            }
+            node.style.setProperty('--nicefont-placeholder-base', `${basePx}px`);
+        },
+
+        /** 作者是否在 style 属性里写了字体相关声明（用于混合策略：此类节点改走内联强制覆盖） */
+        hasAuthorInlineFontRelatedStyle(styleAttr) {
+            if (!styleAttr || !String(styleAttr).trim()) return false;
+            return /\b(?:font-size|font-family|font|font-weight|font-variant|font-stretch|line-height)\s*:/i.test(styleAttr);
+        },
+
+        /** 全局：字号档位 + .nicefont-applied 字族；描边/阴影为全页一条规则（与 class 分档共用同一 style 标签） */
+        updateClassModeStyles(doc, sizeBases) {
+            const root = doc.documentElement;
+            if (!root) return;
+            const adj = `${appState.currentAdjustment}px`;
+            const font = appState.currentFontFamily;
+            const strokeCSS = this.getStrokeCSS(appState.textStroke);
+            const shadowCSS = this.getShadowCSS(appState.textShadow);
+            root.style.setProperty('--nicefont-adjustment', adj);
+            root.style.setProperty('--nicefont-family', font !== 'none' ? font : 'inherit');
+            root.style.setProperty('--nicefont-stroke', strokeCSS || 'none');
+            root.style.setProperty('--nicefont-shadow', shadowCSS || 'none');
+            root.classList.add('NiceFont-stroke-shadow');
+            const sizeRules = (sizeBases || []).map(s => `.nicefont-s${s} { font-size: calc(${s}px + var(--nicefont-adjustment)) !important; }`).join('\n');
+            const styleEl = this.getOrCreateGlobalStyle(doc);
+            if (styleEl) {
+                const panelNot = ':not(nicefont-panel):not(#NiceFont_panel)';
+                const appliedRule = `.nicefont-applied { font-family: var(--nicefont-family) !important; }`;
+                const strokeRule = `.NiceFont-stroke-shadow *${panelNot} { -webkit-text-stroke: var(--nicefont-stroke) !important; text-stroke: var(--nicefont-stroke) !important; text-shadow: var(--nicefont-shadow) !important; }`;
+                /* 伪元素字号：calc(每元素变量基准 + 全页 adjustment)，变量由 syncContentEditablePlaceholderBase 写入 */
+                const cePlaceholderRule = `html body .input-normal-wrap [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1"])::before,
+html body .input-normal-wrap [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1"])::after,
+html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1"])::before,
+html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1"])::after {
+  font-size: calc(var(--nicefont-placeholder-base, 14px) + var(--nicefont-adjustment)) !important;
+}`;
+                styleEl.textContent = appliedRule + (sizeRules ? '\n' + sizeRules : '') + '\n' + strokeRule + '\n' + cePlaceholderRule;
+            }
+        },
+
+        /** 清除全局注入（NiceFont-stroke-shadow、变量、#NiceFont-global-styles） */
+        clearGlobalStyles(doc) {
+            const root = doc.documentElement;
+            if (root) {
+                root.classList.remove('NiceFont-stroke-shadow');
+                root.style.removeProperty('--nicefont-adjustment');
+                root.style.removeProperty('--nicefont-family');
+                root.style.removeProperty('--nicefont-stroke');
+                root.style.removeProperty('--nicefont-shadow');
+            }
+            const el = doc.getElementById?.('NiceFont-global-styles') || doc.querySelector?.('#NiceFont-global-styles');
+            if (el) el.remove();
+        },
+
         /** 判断元素是否匹配排除选择器 */
         isExcludedElement(el) {
             return appState.excludedSelectors.some(selector => el.matches(selector));
         },
 
         /** 递归遍历 DOM（含 iframe、Shadow DOM），对非排除元素执行 callback */
-        traverseDOM(el, callback) {
+        traverseDOM(el, callback, options) {
             if (el.nodeType !== Node.ELEMENT_NODE ||
                 el.id === 'NiceFont_panel' ||
                 el.hasAttribute('data-nicefont-panel') ||
@@ -755,27 +883,13 @@
                 try {
                     const iframeDoc = el.contentDocument || el.contentWindow.document;
                     if (iframeDoc && iframeDoc.body) {
-                        const font = appState.currentFontFamily;
-                        if (font !== 'none') {
-                            iframeDoc.documentElement.style.setProperty('font-family', font, 'important');
+                        if (options?.clearIframe) {
+                            this.clearGlobalStyles(iframeDoc);
                         } else {
-                            iframeDoc.documentElement.style.removeProperty('font-family');
+                            const bases = options?.classSizeBases || Array.from({ length: 89 }, (_, i) => i + 8);
+                            this.updateClassModeStyles(iframeDoc, bases);
                         }
-                        const strokeCSS = FontManager.getStrokeCSS(appState.textStroke);
-                        const shadowCSS = FontManager.getShadowCSS(appState.textShadow);
-                        if (strokeCSS) {
-                            iframeDoc.documentElement.style.setProperty('-webkit-text-stroke', strokeCSS, 'important');
-                            iframeDoc.documentElement.style.setProperty('text-stroke', strokeCSS, 'important');
-                        } else {
-                            iframeDoc.documentElement.style.removeProperty('-webkit-text-stroke');
-                            iframeDoc.documentElement.style.removeProperty('text-stroke');
-                        }
-                        if (shadowCSS) {
-                            iframeDoc.documentElement.style.setProperty('text-shadow', shadowCSS, 'important');
-                        } else {
-                            iframeDoc.documentElement.style.removeProperty('text-shadow');
-                        }
-                        this.traverseDOM(iframeDoc.body, callback);
+                        this.traverseDOM(iframeDoc.body, callback, options);
                     }
                 } catch (e) {
                     //console.error('[NiceFont] 访问 iframe 失败:', e);
@@ -785,7 +899,7 @@
                 try {
                     for (const child of el.shadowRoot.children) {
                         if (!this.isExcludedElement(child)) {
-                            this.traverseDOM(child, callback);
+                            this.traverseDOM(child, callback, options);
                         }
                     }
                 } catch (e) {
@@ -793,54 +907,70 @@
                 }
             }
             for (const child of el.children) {
-                this.traverseDOM(child, callback);
+                this.traverseDOM(child, callback, options);
             }
         },
 
-        /** 递归应用字体大小与字体族到页面元素 */
+        /** 递归应用：默认 class 分档 + 全局描边/阴影；若作者已在 style 中声明字体相关则对该节点用内联强制覆盖 */
         applyFontRecursively(el, increment) {
             if (appState.isExcludedSite) return;
             const font = appState.currentFontFamily;
+
+            this.clearGlobalStyles(document);
+
+            const classSizeBases = Array.from({ length: 89 }, (_, i) => i + 8);
+            this.updateClassModeStyles(document, classSizeBases);
+
+            const opts = { classSizeBases };
+
             this.traverseDOM(el, (node) => {
+                this.styleCache.delete(node);
+                const originalStyleAttrBeforeStrip = node.getAttribute('style') ?? '';
+                const useInlineFont = this.hasAuthorInlineFontRelatedStyle(originalStyleAttrBeforeStrip);
+                const styleBeforeStrip = window.getComputedStyle(node);
+                const hadDataDefault = node.hasAttribute('data-fontsize-default-fontsize');
+                const fromClassBeforeStrip = this.parseNicefontSizeClassBase(node);
+                const baseFontSize = this.getEffectiveBaseFontSizePx(node, styleBeforeStrip);
+
+                this.stripNodeNiceFontArtifacts(node);
+                this.styleCache.delete(node);
                 const style = this.getCachedStyle(node);
+
                 const isVisible = style.display !== 'none' && style.visibility !== 'hidden';
-                // 新增：对 textarea 和 input 强制处理，即使没有子文本
                 const isFormControl = node.tagName === 'TEXTAREA' || node.tagName === 'INPUT';
-                if ((Utils.hasVisibleText(node) || isFormControl) && isVisible) {
-                    let currentFontSize = node.style.fontSize || style.fontSize;
-                    if (!node.hasAttribute('data-default-fontsize')) {
-                        node.setAttribute('data-default-fontsize', currentFontSize);
+                const isCePlaceholder = node.getAttribute('contenteditable') === 'true' && node.hasAttribute('placeholder');
+                if ((Utils.hasVisibleText(node) || isFormControl || isCePlaceholder) && isVisible) {
+                    if (isCePlaceholder) {
+                        this.syncContentEditablePlaceholderBase(node);
+                    }
+                    const currentFontSize = node.style.fontSize || style.fontSize;
+                    if (useInlineFont && !hadDataDefault) {
+                        node.setAttribute(
+                            'data-fontsize-default-fontsize',
+                            fromClassBeforeStrip != null ? `${fromClassBeforeStrip}px` : currentFontSize
+                        );
+                        node.setAttribute('data-nicefont-restore-style', originalStyleAttrBeforeStrip);
                     }
                     if (currentFontSize != '0px') {
-                        const baseFontSize = parseFloat(Utils.convertToPx(node, node.getAttribute('data-default-fontsize')));
-                        if (!isNaN(baseFontSize)) {
-                            node.style.setProperty('font-size', `${baseFontSize + increment}px`, 'important');
-                        }
-                        if (font !== 'none') {
-                            node.style.setProperty('font-family', font, 'important');
-                        } else {
-                            node.style.removeProperty('font-family');
-                        }
-                        const strokeCSS = FontManager.getStrokeCSS(appState.textStroke);
-                        const shadowCSS = FontManager.getShadowCSS(appState.textShadow);
-                        if (strokeCSS) {
-                            node.style.setProperty('-webkit-text-stroke', strokeCSS, 'important');
-                            node.style.setProperty('text-stroke', strokeCSS, 'important');
-                        } else {
-                            node.style.removeProperty('-webkit-text-stroke');
-                            node.style.removeProperty('text-stroke');
-                        }
-                        if (shadowCSS) {
-                            node.style.setProperty('text-shadow', shadowCSS, 'important');
-                        } else {
-                            node.style.removeProperty('text-shadow');
+                        if (baseFontSize != null && !isNaN(baseFontSize)) {
+                            if (useInlineFont) {
+                                node.style.setProperty('font-size', `${baseFontSize + increment}px`, 'important');
+                                if (font !== 'none') {
+                                    node.style.setProperty('font-family', font, 'important');
+                                } else {
+                                    node.style.removeProperty('font-family');
+                                }
+                            } else {
+                                const s = this.getSizeClassBase(baseFontSize);
+                                node.classList.add('nicefont-applied', `nicefont-s${s}`);
+                            }
                         }
                     }
                 }
-            });
+            }, opts);
         },
 
-        /** 恢复字体：清除 data-default-fontsize，移除 font-size/font-family */
+        /** 恢复字体：若有 data-nicefont-restore-style 则还原为首次记录时的 style；否则按旧逻辑逐项移除 */
         restoreFont(el) {
             appState.currentAdjustment = 0;
             appState.currentFontFamily = 'none';
@@ -848,23 +978,45 @@
             appState.textShadow = 0;
             appState.intervalSeconds = 0;
             appState.firstAdjustmentTime = 0;
+            this.clearGlobalStyles(document);
             this.traverseDOM(el, (node) => {
                 const isFormControl = node.tagName === 'TEXTAREA' || node.tagName === 'INPUT';
-                if (Utils.hasVisibleText(node) || isFormControl) {
-                    const defaultSize = node.getAttribute('data-default-fontsize');
-                    if (defaultSize) {
-                        node.style.fontSize = defaultSize;
-                        node.removeAttribute('data-default-fontsize');
-                    } else {
-                        node.style.removeProperty('font-size');
+                const isCePh = node.getAttribute('contenteditable') === 'true' && node.hasAttribute('placeholder');
+                if (Utils.hasVisibleText(node) || isFormControl || isCePh) {
+                    if (node.hasAttribute('data-nicefont-placeholder-base')) {
+                        node.removeAttribute('data-nicefont-placeholder-base');
+                        node.style.removeProperty('--nicefont-placeholder-base');
                     }
-                    node.style.removeProperty('font-family');
-                    node.style.removeProperty('-webkit-text-stroke');
-                    node.style.removeProperty('text-stroke');
-                    node.style.removeProperty('text-shadow');
+                    node.classList.remove('nicefont-applied');
+                    for (let i = 8; i <= 96; i++) node.classList.remove(`nicefont-s${i}`);
+                    const saved = node.getAttribute('data-nicefont-restore-style');
+                    if (saved !== null) {
+                        if (saved === '') {
+                            node.removeAttribute('style');
+                        } else {
+                            node.setAttribute('style', saved);
+                        }
+                        node.removeAttribute('data-fontsize-default-fontsize');
+                        node.removeAttribute('data-nicefont-restore-style');
+                    } else {
+                        const defaultSize = node.getAttribute('data-fontsize-default-fontsize');
+                        if (defaultSize) {
+                            node.style.fontSize = defaultSize;
+                        } else {
+                            node.style.removeProperty('font-size');
+                        }
+                        node.removeAttribute('data-fontsize-default-fontsize');
+                        node.style.removeProperty('font-family');
+                        node.style.removeProperty('-webkit-text-stroke');
+                        node.style.removeProperty('text-stroke');
+                        node.style.removeProperty('text-shadow');
+                        if (!node.style.cssText.trim()) {
+                            node.removeAttribute('style');
+                        }
+                    }
                     this.styleCache.delete(node);
                 }
-            });
+            }, { clearIframe: true });
         },
 
         /** 调整字体大小（累加 increment），并应用至页面 */
@@ -874,7 +1026,6 @@
             this.applyFontRecursively(document.body, appState.currentAdjustment);
             checkConfigModified();
             UIManager.updateUI();
-            log(`字体大小调整: ${increment}px, 当前: ${appState.currentAdjustment}px`);
         }
     };
 
@@ -904,9 +1055,6 @@
                                 FontManager.applyFontRecursively(document.body, appState.currentAdjustment);
                                 checkConfigModified();
                                 UIManager.updateUI();
-                                log(`字体类型设置为: ${newFont}`);
-                            } else {
-                                log('取消字体输入');
                             }
                         } else {
                             const shadow = UIManager.panelCache?.shadowRoot;
@@ -917,7 +1065,6 @@
                                 select.remove();
                                 document.removeEventListener('click', UIManager.closeDropdown);
                                 UIManager.closeDropdown = null;
-                                log('移除现有字体下拉菜单');
                                 return;
                             }
                             select = document.createElement('select');
@@ -965,7 +1112,6 @@
                                             select.remove();
                                             document.removeEventListener('click', UIManager.closeDropdown);
                                             UIManager.closeDropdown = null;
-                                            log('取消自定义字体输入');
                                             return;
                                         }
                                     } else {
@@ -977,18 +1123,15 @@
                                     select.remove();
                                     document.removeEventListener('click', UIManager.closeDropdown);
                                     UIManager.closeDropdown = null;
-                                    log(`字体类型设置为: ${appState.currentFontFamily}`);
                                 });
                                 UIManager.closeDropdown = (event) => {
                                     if (!select.contains(event.target) && !btn.contains(event.target)) {
                                         select.remove();
                                         document.removeEventListener('click', UIManager.closeDropdown);
                                         UIManager.closeDropdown = null;
-                                        log('下拉菜单关闭');
                                     }
                                 };
                                 document.addEventListener('click', UIManager.closeDropdown);
-                                log('字体下拉菜单创建并显示');
                             }
                         }
                     },
@@ -1007,7 +1150,6 @@
                                 FontManager.applyFontRecursively(document.body, appState.currentAdjustment);
                                 checkConfigModified();
                                 UIManager.updateUI();
-                                log(`字体描边设置为: ${val}`);
                             }
                         } else {
                             UIManager.showStrokeSlider();
@@ -1028,7 +1170,6 @@
                                 FontManager.applyFontRecursively(document.body, appState.currentAdjustment);
                                 checkConfigModified();
                                 UIManager.updateUI();
-                                log(`字体阴影设置为: ${val}`);
                             }
                         } else {
                             UIManager.showShadowSlider();
@@ -1067,7 +1208,6 @@
                         FontManager.restoreFont(document.body);
                         checkConfigModified();
                         UIManager.updateUI();
-                        log('恢复字体');
                     },
                     autoClose: false,
                     displayInPluginPanel: true,
@@ -1088,7 +1228,6 @@
                             if (secs > 0) {
                                 appState.intervalSeconds = 0;
                                 appState.dynamicAdjustment = false;
-                                log(`首次调整设置为: ${secs}s`);
                                 checkConfigModified();
                             }
                             if (this.panelCache) {
@@ -1116,7 +1255,6 @@
                             if (secs > 0) {
                                 appState.firstAdjustmentTime = 0;
                                 appState.dynamicAdjustment = false;
-                                log(`定时调整设置为: ${secs}s`);
                                 checkConfigModified();
                             }
                             if (this.panelCache) {
@@ -1141,7 +1279,6 @@
                             if (appState.dynamicAdjustment) {
                                 appState.firstAdjustmentTime = 0;
                                 appState.intervalSeconds = 0;
-                                log('动态调整启用');
                                 checkConfigModified();
                             }
                             if (this.panelCache) {
@@ -1170,7 +1307,6 @@
                                 FontManager.applyFontRecursively(document.body, appState.currentAdjustment);
                                 checkConfigModified();
                                 UIManager.updateUI();
-                                log(`排除元素设置为: ${input}`);
                             } else {
                                 alert(t.invalidSelectorAlert);
                             }
@@ -1188,14 +1324,12 @@
                         if (newPanelType === 'floatingPanel') {
                             const shouldAutoOpen = confirm(t.autoOpenFloatingPanelPrompt);
                             GM_setValue('NiceFont_autoOpenPageMenu', !shouldAutoOpen);
-                            log(`设置 NiceFont_autoOpenPageMenu: ${!shouldAutoOpen}`);
                         }
                         GM_setValue(Constants.PANEL_TYPE_KEY, newPanelType);
                         appState.panelType = newPanelType;
                         if (this.panelCache) {
                             this.panelCache.remove();
                             this.panelCache = null;
-                            log('移除现有浮动面板');
                         }
                         if (newPanelType === 'floatingPanel') {
                             this.createFloatingPanel();
@@ -1203,21 +1337,18 @@
                                 const shadow = this.panelCache.shadowRoot;
                                 const panelContainer = shadow.querySelector('div');
                                 if (panelContainer) {
-                                    if (!ConfigScopeManager.hasConfig() && !GM_getValue('NiceFont_autoOpenPageMenu', false)) {
-                                        panelContainer.style.display = 'block';
-                                        appState.isAutoOpened = true;
-                                        log('直接创建并显示浮动面板（切换到网页菜单模式），isAutoOpened=true');
-                                    }
+                                    // 显式切换到浮动面板时始终打开一次；确认框只写入 NiceFont_autoOpenPageMenu，影响后续无配置页的自动弹出
+                                    panelContainer.style.display = 'block';
+                                    appState.isAutoOpened = true;
                                 }
                             } else {
                                 console.error('[NiceFont] panelCache 或 shadowRoot 未正确初始化，面板显示失败');
                             }
                         }
                         UIManager.updateUI();
-                        log(`切换到面板类型: ${newPanelType}`);
                     },
-                    displayInPluginPanel: false,
-                    displayInFloatingPanel: false
+                    displayInPluginPanel: true,
+                    displayInFloatingPanel: true
                 },
                 {
                     id: 'show-panel',
@@ -1291,7 +1422,6 @@
             commands.forEach(cmd => {
                 const handle = GM_registerMenuCommand(cmd.getText(), () => {
                     cmd.action();
-                    log(`执行插件菜单命令: ${cmd.id}`);
                     this.updatePluginPanel();
                 }, { autoClose: cmd.autoClose, title: cmd.title });
                 this.menuHandles.push(handle);
@@ -1301,7 +1431,6 @@
         /** 刷新浮动面板内的按钮列表 */
         updatePanelContent() {
             if (!this.panelCache || !this.panelCache.shadowRoot) {
-                log('panelCache 或 shadowRoot 不存在，跳过更新内容');
                 return;
             }
             const scriptName = t.panelTitle;
@@ -1317,13 +1446,12 @@
             const contentContainer = shadow.querySelector('.NiceFont_content');
             if (contentContainer) {
                 contentContainer.innerHTML = this.getCommandsConfig()
-                    .filter(cmd => cmd.displayInFloatingPanel && (!appState.isExcludedSite || ['currentConfigScope', 'config-scope', 'export-import-config', 'save-config'].includes(cmd.id)))
+                    .filter(cmd => cmd.displayInFloatingPanel && (!appState.isExcludedSite || ['currentConfigScope', 'config-scope', 'export-import-config', 'save-config', 'switch-panel'].includes(cmd.id)))
                     .map(cmd => {
                         const html = cmd.getFloatingPanelHtml ? cmd.getFloatingPanelHtml() : cmd.getText();
                         return `<div class="action-btn" id="NiceFont_${cmd.id}">${html}</div>`;
                     })
                     .join('');
-                log('面板内容更新成功');
             } else {
                 console.error('[NiceFont] 未找到 .NiceFont_content，无法更新内容');
             }
@@ -1426,11 +1554,9 @@
             if (this.closeDropdown) {
                 document.removeEventListener('click', this.closeDropdown);
                 this.closeDropdown = null;
-                log('清理 closeDropdown 事件监听器（创建新面板）');
             }
             let existingPanel = document.querySelector('nicefont-panel');
             if (existingPanel && existingPanel.shadowRoot) {
-                log('nicefont-panel 已存在，跳过创建');
                 this.panelCache = existingPanel;
                 return;
             }
@@ -1438,7 +1564,6 @@
             if (this.panelCache) {
                 this.panelCache.remove();
                 this.panelCache = null;
-                log('清理现有 panelCache');
             }
 
             const scriptName = t.panelTitle;
@@ -1612,7 +1737,6 @@
 
             try {
                 document.documentElement.appendChild(this.panelCache);
-                log('浮动面板创建并添加到 document.documentElement');
             } catch (e) {
                 console.error('[NiceFont] 添加面板到 DOM 失败:', e);
                 this.panelCache = null;
@@ -1627,24 +1751,20 @@
             if (this.persistenceInterval) {
                 clearInterval(this.persistenceInterval);
                 this.persistenceInterval = null;
-                log('面板持久性检查已清理');
             }
         },
 
         ensurePanelPersistence() {
             if (appState.panelType !== 'floatingPanel') {
-                log('插件菜单模式，无需确保面板持久性');
                 return;
             }
             this.persistenceInterval = setInterval(() => {
                 if (appState.panelType !== 'floatingPanel') {
                     clearInterval(this.persistenceInterval);
                     this.persistenceInterval = null;
-                    log('切换到插件菜单模式，停止面板持久性检查');
                     return;
                 }
                 if (!this.panelCache || !(this.panelCache instanceof Node) || !document.documentElement.contains(this.panelCache)) {
-                    log('检测到面板无效或被移除，重新创建');
                     this.createFloatingPanel();
                     if (this.panelCache && this.panelCache instanceof Node) {
                         try {
@@ -1654,7 +1774,6 @@
                             const panelContainer = shadow.querySelector('div');
                             if (panelContainer && appState.isAutoOpened) {
                                 panelContainer.style.display = 'block';
-                                log('面板重新显示，isAutoOpened=true');
                             }
                         } catch (e) {
                             this.panelCache = null;
@@ -1662,7 +1781,6 @@
                     }
                 }
             }, 1000);
-            log('面板持久性检查已启用');
         },
 
         bindPanelEvents(shadow, panelContainer) {
@@ -1700,7 +1818,6 @@
                 initialX = x - currentLeft;
                 initialY = y - currentTop;
                 header.style.cursor = 'grabbing';
-                log('开始拖拽');
                 e.preventDefault();
                 e.stopPropagation();
             };
@@ -1740,7 +1857,6 @@
                     top: panelContainer.style.top,
                     right: `${Math.max(0, right)}px`
                 });
-                log('拖拽结束, 面板位置保存:', panelContainer.style.top, panelContainer.style.right);
                 e.preventDefault();
                 e.stopPropagation();
             };
@@ -1783,46 +1899,40 @@
                 if (e.target.classList.contains('nf-export')) {
                     e.preventDefault();
                     ConfigManager.exportConfig();
-                    log('执行导出配置');
                     return;
                 }
                 if (e.target.classList.contains('nf-import')) {
                     e.preventDefault();
                     ConfigManager.importConfig();
-                    log('执行导入配置');
                     return;
                 }
                 if (e.target.classList.contains('nf-clear-config')) {
                     e.preventDefault();
                     ConfigManager.clearAllConfig();
-                    log('执行清空所有配置');
                     return;
                 }
                 const btn = e.target.closest('.action-btn');
                 if (btn) {
                     const command = this.getCommandsConfig().find(c => c.id === btn.id.replace('NiceFont_', ''));
                     if (command && command.id !== 'increase' && command.id !== 'decrease') {
-                        log(`执行命令: ${command.id}`);
                         command.action();
                     }
                 }
                 if (e.target.id === 'NiceFont_close-btn') {
                     panelContainer.style.display = 'none';
                     appState.isAutoOpened = false;
-                    log(`面板关闭，isAutoOpened=false`);
                 }
                 e.stopPropagation();
             }, { capture: false });
+
         },
 
         /** 切换浮动面板显示/隐藏 */
         togglePanel() {
             if (appState.panelType !== 'floatingPanel') {
-                log('非浮动面板模式，忽略 togglePanel');
                 return;
             }
             if (!this.panelCache || !document.documentElement.contains(this.panelCache)) {
-                log('panelCache 不存在或未附加到 DOM，尝试重新创建');
                 this.createFloatingPanel();
                 if (!this.panelCache) {
                     console.error('[NiceFont] 面板创建失败，检查 createFloatingPanel');
@@ -1836,7 +1946,6 @@
             const display = isHidden ? 'block' : 'none';
             panelContainer.style.display = display;
             appState.isAutoOpened = false;
-            log(`面板显示状态: ${display}, isAutoOpened=false`);
 
             if (display === 'block') {
                 this.updatePanelContent();
@@ -1844,34 +1953,28 @@
                 if (this.closeDropdown) {
                     document.removeEventListener('click', this.closeDropdown);
                     this.closeDropdown = null;
-                    log('清理 closeDropdown 事件监听器（面板关闭）');
                 }
             }
         },
 
         /** 根据 panelType 更新插件菜单或浮动面板 */
         updateUI() {
-            log('调用 updateUI 当前菜单面板:', appState.panelType);
             if (appState.panelType === 'pluginPanel') {
                 this.updatePluginPanel();
                 this.cleanupPersistence();
                 if (this.panelCache) {
                     this.panelCache.remove();
                     this.panelCache = null;
-                    log('移除浮动面板（切换到插件菜单）');
                 }
                 if (this.closeDropdown) {
                     document.removeEventListener('click', this.closeDropdown);
                     this.closeDropdown = null;
-                    log('清理 closeDropdown 事件监听器（切换到插件菜单）');
                 }
             } else {
                 this.updatePluginPanel();
                 const hasSlider = this.panelCache?.shadowRoot?.querySelector('#NiceFont_stroke-slider-wrap, #NiceFont_shadow-slider-wrap');
                 if (this.panelCache && document.documentElement.contains(this.panelCache)) {
                     if (!hasSlider) this.updatePanelContent();
-                } else {
-                    log('panelCache 不存在，等待 togglePanel 创建');
                 }
                 if (this.panelCache?.shadowRoot) {
                     const saveBtn = this.panelCache.shadowRoot.querySelector('#NiceFont_save-config');
@@ -1906,14 +2009,12 @@
         if (appState.firstAdjustmentTime > 0) {
             setTimeout(() => {
                 FontManager.applyFontRecursively(document.body, appState.currentAdjustment);
-                log('应用首次字体调整');
             }, appState.firstAdjustmentTime * 1000);
         }
         if (appState.intervalSeconds > 0) {
             appState.timer = setInterval(() => {
                 FontManager.applyFontRecursively(document.body, appState.currentAdjustment);
             }, appState.intervalSeconds * 1000);
-            log(`定时调整启用: ${appState.intervalSeconds}s`);
         }
         if (appState.dynamicAdjustment) {
             const throttleTime = document.body.childElementCount > 500 ? 500 : 300;
@@ -1922,7 +2023,6 @@
             }, throttleTime));
             appState.observer.observe(document.body, { childList: true, subtree: true });
             FontManager.applyFontRecursively(document.body, appState.currentAdjustment);
-            log('动态调整启用');
         } else if (!appState.firstAdjustmentTime && !appState.intervalSeconds) {
             FontManager.applyFontRecursively(document.body, appState.currentAdjustment);
         }
@@ -2436,7 +2536,6 @@
     function init() {
         let panelType = GM_getValue(Constants.PANEL_TYPE_KEY, 'pluginPanel');
         appState.panelType = panelType;
-        log(`面板类型设置为: ${panelType}`);
 
         ConfigManager.loadConfig();
 
@@ -2459,14 +2558,10 @@
                     const panelContainer = shadow.querySelector('div');
                     panelContainer.style.display = 'block';
                     appState.isAutoOpened = true;
-                    log('无配置且浮动面板模式，自动显示菜单面板，isAutoOpened=true');
                 }
-            } else {
-                log('自动弹出已禁用（NiceFont_autoOpenPageMenu=true）');
             }
         }
 
-        log('脚本初始化完成');
     }
 
     init();

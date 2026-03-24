@@ -49,6 +49,16 @@ If you like this plugin, please give our GitHub project [NiceFont](https://githu
 
 ## 📜 Changelog
 
+### v4.3.0 - 2026-03-24
+
+- **New Features**:
+  - Added local file support: include the `file://*/*` match rule so NiceFont can run on local HTML files.
+- **Improvements**:
+  - Upgraded font application strategy to a "class tiers + inline hybrid override" model, reducing side effects on page-native styles while keeping consistent results.
+  - Improved compatibility for `contenteditable + placeholder` scenarios by refining pseudo-element placeholder font-size handling.
+  - Optimized panel switching behavior: when switching to floating panel mode, the panel opens immediately once for clearer interaction.
+  - Removed debug log output to reduce console noise.
+
 ### v4.2.0 - 2026-03-05
 
 - **New Features**:
@@ -174,6 +184,15 @@ If you like this plugin, please give our GitHub project [NiceFont](https://githu
 - **How to customize fonts?**  
   In the menu, select "Set Font Type" to choose from built-in fonts (e.g., Arial, SimSun) or input custom font names. You can also select the "auto" mode and modify global fonts in your browser settings.
 
+- **How do I use "Exclude Elements"?**  
+  Add regions you do not want adjusted (such as code blocks or toolbars) to "Exclude Elements". A simple 3-step flow: right-click target area -> Inspect -> Copy selector, then paste it into NiceFont and save.  
+  Example copied selector: `#app > div.layout > main > div.editor-wrap > div.toolbar > button:nth-child(3)`. You can usually simplify it to `.toolbar` or `button`. Simpler selectors are often more stable, but may affect a wider range. Prefer class selectors like `.toolbar` first.  
+  Common rules: `.hljs, pre, code`, `svg, canvas`, `[contenteditable="true"]`. To revert, remove the corresponding rule in "Current Configuration Scope".
+
+- **How should I choose first-time, scheduled, or dynamic adjustment?**  
+  Choose based on page update frequency: use "First-time" when pages are mostly static; use "Scheduled" when content loads in batches but not continuously; use "Dynamic" for continuously changing pages like comment feeds, chats, or online docs.  
+  If unsure, start with "First-time", then add "Scheduled" if needed, and use "Dynamic" last (best real-time behavior, but highest performance overhead).
+
 - **What should I do if I encounter issues?**  
   Please submit feedback via [GitHub Issues](https://github.com/10D24D/NiceFont/issues) or [Greasyfork Feedback](https://greasyfork.org/en/scripts/533232-nicefont/feedback); we will resolve them as soon as possible!
 
@@ -191,3 +210,20 @@ NiceFont is licensed under the [Apache License 2.0](https://www.apache.org/licen
 ## ⚠️ Disclaimer
 
 NiceFont is a free open-source project. By using this script, you agree to bear any associated risks. The developer is not responsible for any issues or losses resulting from the use of this script.
+
+## ☕ Buy Me a Coffee
+
+If this project helps you, feel free to buy the author a coffee. Your support is the biggest motivation for continuous development. Thank you to everyone who chooses to support!
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="../static/wxpay.jpg" width="180"/><br/>
+      <sub>WeChat Pay</sub>
+    </td>
+    <td align="center">
+      <img src="../static/alipay.jpg" width="180"/><br/>
+      <sub>Alipay</sub>
+    </td>
+  </tr>
+</table>
