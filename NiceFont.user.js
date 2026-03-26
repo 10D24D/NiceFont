@@ -10,7 +10,7 @@
 // @name:de       NiceFont (Schöne Schrift)
 // @name:es       NiceFont (Fuente agradable)
 // @name:pt       NiceFont (Fonte agradável)
-// @version      4.3.0
+// @version      4.3.1
 // @author       DD1024z
 // @description  NiceFont: 是一款优化网页字体显示的工具，让浏览更清晰、舒适！“真正调整字体，而非页面缩放，拒绝将就”！可直接修改网页的字体大小与风格，保存你的字体设置，轻松应用到每个网页，支持首次、定时或动态调整字体，适配子域名、整站或全局设置，几乎兼容所有网站！
 // @description:zh-TW  NiceFont：優化網頁字體顯示的工具，瀏覽更清晰、舒適！「真正調整字體，非頁面縮放，拒絕將就」！直接修改字體大小與風格，儲存設定，輕鬆應用於各網頁，支援首次、定時或動態調整，適配子域名或全局設定，幾乎相容所有網站！
