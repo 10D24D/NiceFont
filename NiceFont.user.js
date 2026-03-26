@@ -153,6 +153,7 @@
         pendingScopeChange: null,
         observer: null,
         timer: null,
+        firstAdjustmentTimeout: null,
         isAutoOpened: false,
         excludedSelectors: ['i', 'code', 'code *', 'pre', 'pre *', 'svg', 'canvas', 'kbd', 'samp'],
         textStroke: 0,
@@ -252,8 +253,16 @@
 
         /** 范围对应的多语言文案 */
         getScopeText(scope) {
-            if (scope === 0) return t.excludeThisSite;
+            if (scope === 0) return t.currentConfigScopeExcluded.replace('{hostname}', window.location.hostname);
             return scope === 1 ? t.subdomain : scope === 2 ? t.topLevelDomain : t.allWebsites;
+        },
+
+        /** 范围展示文本（带具体目标） */
+        getScopeDisplayText(scope) {
+            if (scope === 0) return t.currentConfigScopeExcluded.replace('{hostname}', window.location.hostname);
+            if (scope === 1) return t.subdomain;
+            if (scope === 2) return t.topLevelDomain;
+            return t.allWebsites;
         },
 
         /** 当前配置的显示文本（hostname、*.tld、全部网站等） */
@@ -273,10 +282,10 @@
         /** 配置范围显示文本，含 pendingScopeChange 时显示 "当前 -> 目标" */
         getConfigScopeDisplayText() {
             const effectiveScope = this.getEffectiveScope();
-            const currentScopeText = this.getScopeText(effectiveScope);
+            const currentScopeText = this.getScopeDisplayText(effectiveScope);
             const pendingScope = appState.pendingScopeChange;
             if (pendingScope !== null && pendingScope !== effectiveScope) {
-                const targetScopeText = this.getScopeText(pendingScope);
+                const targetScopeText = this.getScopeDisplayText(pendingScope);
                 return `${currentScopeText} -> ${targetScopeText}`;
             }
             return currentScopeText;
@@ -353,19 +362,80 @@
             appState.dynamicAdjustment = !!config.watcher;
             appState.intervalSeconds = (typeof config.timer === 'number' && config.timer >= 0) ? config.timer : 0;
             appState.firstAdjustmentTime = (typeof config.firstTime === 'number' && config.firstTime >= 0) ? config.firstTime : 0;
+            // 兼容旧配置：历史定时调整自动迁移为动态调整开启 + 定时关闭
+            const hadLegacyTimer = appState.intervalSeconds > 0;
+            if (appState.intervalSeconds > 0) {
+                appState.dynamicAdjustment = true;
+                appState.intervalSeconds = 0;
+            }
+            // 互斥策略：首次调整与动态调整二选一（优先保留首次调整）
+            if (appState.firstAdjustmentTime > 0 && appState.dynamicAdjustment) {
+                appState.dynamicAdjustment = false;
+            }
             appState.excludedSelectors = Array.isArray(config.excludedSelectors) && config.excludedSelectors.length > 0
                 ? config.excludedSelectors
                 : ['i', 'code', 'code *', 'pre', 'pre *', 'svg', 'canvas', 'kbd', 'samp'];
             appState.textStroke = FontManager.parseStrokeValue(config.textStroke);
             appState.textShadow = FontManager.parseShadowValue(config.textShadow);
             appState.targetScope = [0, 1, 2, 3].includes(effectiveScope) ? effectiveScope : 1;
+            if (hadLegacyTimer && configKey) {
+                GM_setValue(configKey, {
+                    ...config,
+                    watcher: appState.dynamicAdjustment,
+                    timer: 0
+                });
+            }
 
             updateSavedSnapshot();
+        },
+
+        /** 不弹确认，直接按 scope 落盘并刷新状态 */
+        applyScopeConfigDirect(scope) {
+            ConfigScopeManager.initKeys();
+            const key = scope === 0 ? ConfigScopeManager.excludedKey :
+                scope === 1 ? ConfigScopeManager.subdomainKey :
+                    scope === 2 ? ConfigScopeManager.topLevelKey : Constants.GLOBAL_DEFAULT_KEY;
+
+            if (scope === 0) {
+                GM_setValue(key, { excluded: true });
+                appState.isExcludedSite = true;
+                appState.currentAdjustment = 0;
+                appState.currentFontFamily = 'none';
+                appState.textStroke = 0;
+                appState.textShadow = 0;
+                appState.dynamicAdjustment = false;
+                appState.intervalSeconds = 0;
+                appState.firstAdjustmentTime = 0;
+                FontManager.restoreFont(document.body);
+            } else {
+                const config = {
+                    increment: appState.fontIncrement,
+                    resize: appState.currentAdjustment,
+                    watcher: appState.dynamicAdjustment,
+                    timer: appState.intervalSeconds,
+                    fontFamily: appState.currentFontFamily,
+                    firstTime: appState.firstAdjustmentTime,
+                    excludedSelectors: appState.excludedSelectors,
+                    textStroke: appState.textStroke,
+                    textShadow: appState.textShadow
+                };
+                GM_setValue(key, config);
+                appState.isExcludedSite = false;
+            }
+
+            appState.isConfigModified = false;
+            appState.targetScope = scope;
+            appState.pendingScopeChange = null;
+            ConfigManager.loadConfig();
+            setupScheduledAdjustments();
+            UIManager.updateUI();
+            UIManager.closeFloatingPanel();
         },
 
         /** 保存当前 appState 到指定范围，需用户确认 */
         saveConfig() {
             let scope = appState.pendingScopeChange !== null ? appState.pendingScopeChange : appState.targetScope;
+            let skipConfirm = false;
 
             if (!appState.isConfigModified && appState.pendingScopeChange === null) {
                 scope = appState.targetScope;
@@ -376,6 +446,32 @@
                 scope = 1;
             }
 
+            const hasVisualAdjustment =
+                appState.currentAdjustment !== 0 ||
+                appState.currentFontFamily !== 'none' ||
+                appState.textStroke > 0 ||
+                appState.textShadow > 0;
+            const hasApplyMode = appState.firstAdjustmentTime > 0 || appState.dynamicAdjustment;
+            if (hasVisualAdjustment && !hasApplyMode) {
+                const promptText = t.adjustmentModeRequiredPrompt ||
+                    'Detected font changes, but neither "First Adjustment" nor "Dynamic Adjustment" is enabled.\nChoose one to continue saving:\n1: First Adjustment (default 3s)\n2: Dynamic Adjustment';
+                const invalidText = t.adjustmentModeRequiredInvalid || 'Invalid input. Save cancelled.';
+                const input = prompt(promptText, '2');
+                if (input === null) return;
+                const mode = parseInt(input, 10);
+                if (mode === 1) {
+                    appState.firstAdjustmentTime = appState.firstAdjustmentTime > 0 ? appState.firstAdjustmentTime : 3;
+                    appState.dynamicAdjustment = false;
+                } else if (mode === 2) {
+                    appState.dynamicAdjustment = true;
+                    appState.firstAdjustmentTime = 0;
+                } else {
+                    alert(invalidText);
+                    return;
+                }
+                skipConfirm = true;
+            }
+
             const scopeText = ConfigScopeManager.getScopeText(scope);
             const target = scope === 0 ? window.location.hostname :
                 scope === 1 ? window.location.hostname :
@@ -384,56 +480,19 @@
                 t.saveConfigConfirm.replace('{scope}', scopeText).replace(' [{target}]', '') :
                 t.saveConfigConfirm.replace('{scope}', scopeText).replace('{target}', target);
 
-            if (confirm(confirmMessage)) {
-                ConfigScopeManager.initKeys();
-                const key = scope === 0 ? ConfigScopeManager.excludedKey :
-                    scope === 1 ? ConfigScopeManager.subdomainKey :
-                        scope === 2 ? ConfigScopeManager.topLevelKey : Constants.GLOBAL_DEFAULT_KEY;
-
-                if (scope === 0) {
-                    GM_setValue(key, { excluded: true });
-                    appState.isExcludedSite = true;
-                    appState.currentAdjustment = 0;
-                    appState.currentFontFamily = 'none';
-                    appState.textStroke = 0;
-                    appState.textShadow = 0;
-                    appState.dynamicAdjustment = false;
-                    appState.intervalSeconds = 0;
-                    appState.firstAdjustmentTime = 0;
-                    FontManager.restoreFont(document.body);
-                } else {
-                    const config = {
-                        increment: appState.fontIncrement,
-                        resize: appState.currentAdjustment,
-                        watcher: appState.dynamicAdjustment,
-                        timer: appState.intervalSeconds,
-                        fontFamily: appState.currentFontFamily,
-                        firstTime: appState.firstAdjustmentTime,
-                        excludedSelectors: appState.excludedSelectors,
-                        textStroke: appState.textStroke,
-                        textShadow: appState.textShadow
-                    };
-                    GM_setValue(key, config);
-                    appState.isExcludedSite = false;
-                }
-
-                appState.isConfigModified = false;
-                appState.targetScope = scope;
-                appState.pendingScopeChange = null;
-                ConfigManager.loadConfig();
-                setupScheduledAdjustments();
-                UIManager.updateUI();
+            if (skipConfirm || confirm(confirmMessage)) {
+                ConfigManager.applyScopeConfigDirect(scope);
             }
         },
 
         /** 修改配置范围（0/1/2/3），可能触发删除确认 */
         changeConfigScope() {
             const effectiveScope = ConfigScopeManager.getEffectiveScope();
-            const currentScopeText = ConfigScopeManager.getScopeText(effectiveScope);
+            const currentScopeText = ConfigScopeManager.getScopeDisplayText(effectiveScope);
             const input = prompt(
                 t.modifyConfigScopePrompt
                     .replace('{scope}', currentScopeText)
-                    .replace('{hostname}', window.location.hostname)
+                    .replace(/\{hostname\}/g, window.location.hostname)
                     .replace('{tld}', `*.${Utils.getTopLevelDomain().replace(/^\./, '')}`),
                 appState.targetScope
             );
@@ -450,6 +509,18 @@
                 effectiveScope === 1 ? Object.keys(GM_getValue(ConfigScopeManager.subdomainKey, {})).length > 0 :
                     effectiveScope === 2 ? Object.keys(GM_getValue(ConfigScopeManager.topLevelKey, {})).length > 0 :
                         Object.keys(GM_getValue(Constants.GLOBAL_DEFAULT_KEY, {})).length > 0;
+
+            if (effectiveScope === 3 && newScope === 0) {
+                const scopeText = ConfigScopeManager.getScopeText(0);
+                const target = window.location.hostname;
+                const confirmMessage =
+                    `${t.currentConfigScope}: ${ConfigScopeManager.getCurrentConfigText()}\n` +
+                    t.saveConfigConfirm.replace('{scope}', scopeText).replace('{target}', target);
+                if (confirm(confirmMessage)) {
+                    ConfigManager.applyScopeConfigDirect(0);
+                }
+                return;
+            }
 
             if (newScope > effectiveScope && hasConfig) {
                 const confirmMessage = effectiveScope === 3 ?
@@ -827,10 +898,15 @@
             if (!root) return;
             const adj = `${appState.currentAdjustment}px`;
             const font = appState.currentFontFamily;
+            const hasCustomFontFamily = font !== 'none';
             const strokeCSS = this.getStrokeCSS(appState.textStroke);
             const shadowCSS = this.getShadowCSS(appState.textShadow);
             root.style.setProperty('--nicefont-adjustment', adj);
-            root.style.setProperty('--nicefont-family', font !== 'none' ? font : 'inherit');
+            if (hasCustomFontFamily) {
+                root.style.setProperty('--nicefont-family', font);
+            } else {
+                root.style.removeProperty('--nicefont-family');
+            }
             root.style.setProperty('--nicefont-stroke', strokeCSS || 'none');
             root.style.setProperty('--nicefont-shadow', shadowCSS || 'none');
             root.classList.add('NiceFont-stroke-shadow');
@@ -838,7 +914,9 @@
             const styleEl = this.getOrCreateGlobalStyle(doc);
             if (styleEl) {
                 const panelNot = ':not(nicefont-panel):not(#NiceFont_panel)';
-                const appliedRule = `.nicefont-applied { font-family: var(--nicefont-family) !important; }`;
+                const appliedRule = hasCustomFontFamily
+                    ? `.nicefont-applied { font-family: var(--nicefont-family) !important; }`
+                    : '';
                 const strokeRule = `.NiceFont-stroke-shadow *${panelNot} { -webkit-text-stroke: var(--nicefont-stroke) !important; text-stroke: var(--nicefont-stroke) !important; text-shadow: var(--nicefont-shadow) !important; }`;
                 /* 伪元素字号：calc(每元素变量基准 + 全页 adjustment)，变量由 syncContentEditablePlaceholderBase 写入 */
                 const cePlaceholderRule = `html body .input-normal-wrap [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1"])::before,
@@ -847,7 +925,7 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
 html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1"])::after {
   font-size: calc(var(--nicefont-placeholder-base, 14px) + var(--nicefont-adjustment)) !important;
 }`;
-                styleEl.textContent = appliedRule + (sizeRules ? '\n' + sizeRules : '') + '\n' + strokeRule + '\n' + cePlaceholderRule;
+                styleEl.textContent = (appliedRule ? (appliedRule + '\n') : '') + (sizeRules ? (sizeRules + '\n') : '') + strokeRule + '\n' + cePlaceholderRule;
             }
         },
 
@@ -915,12 +993,11 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
         applyFontRecursively(el, increment) {
             if (appState.isExcludedSite) return;
             const font = appState.currentFontFamily;
+            const hasCustomFontFamily = font !== 'none';
 
             this.clearGlobalStyles(document);
-
             const classSizeBases = Array.from({ length: 89 }, (_, i) => i + 8);
             this.updateClassModeStyles(document, classSizeBases);
-
             const opts = { classSizeBases };
 
             this.traverseDOM(el, (node) => {
@@ -962,7 +1039,12 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
                                 }
                             } else {
                                 const s = this.getSizeClassBase(baseFontSize);
-                                node.classList.add('nicefont-applied', `nicefont-s${s}`);
+                                if (hasCustomFontFamily) {
+                                    node.classList.add('nicefont-applied');
+                                } else {
+                                    node.classList.remove('nicefont-applied');
+                                }
+                                node.classList.add(`nicefont-s${s}`);
                             }
                         }
                     }
@@ -970,14 +1052,16 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
             }, opts);
         },
 
-        /** 恢复字体：若有 data-nicefont-restore-style 则还原为首次记录时的 style；否则按旧逻辑逐项移除 */
-        restoreFont(el) {
-            appState.currentAdjustment = 0;
-            appState.currentFontFamily = 'none';
-            appState.textStroke = 0;
-            appState.textShadow = 0;
-            appState.intervalSeconds = 0;
-            appState.firstAdjustmentTime = 0;
+        /** 当前视觉参数是否都为默认值（用于自动清理已挂载样式） */
+        isVisualStateDefault() {
+            return appState.currentAdjustment === 0 &&
+                appState.currentFontFamily === 'none' &&
+                appState.textStroke <= 0 &&
+                appState.textShadow <= 0;
+        },
+
+        /** 仅清理 NiceFont 已注入样式/类，不改 appState 逻辑配置 */
+        clearAppliedStyles(el) {
             this.clearGlobalStyles(document);
             this.traverseDOM(el, (node) => {
                 const isFormControl = node.tagName === 'TEXTAREA' || node.tagName === 'INPUT';
@@ -1019,11 +1103,32 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
             }, { clearIframe: true });
         },
 
+        /** 按当前状态应用或清理字体效果（默认值时自动清理） */
+        applyCurrentState(el = document.body) {
+            if (appState.isExcludedSite || !el) return;
+            if (this.isVisualStateDefault()) {
+                this.clearAppliedStyles(el);
+                return;
+            }
+            this.applyFontRecursively(el, appState.currentAdjustment);
+        },
+
+        /** 恢复字体：若有 data-nicefont-restore-style 则还原为首次记录时的 style；否则按旧逻辑逐项移除 */
+        restoreFont(el) {
+            appState.currentAdjustment = 0;
+            appState.currentFontFamily = 'none';
+            appState.textStroke = 0;
+            appState.textShadow = 0;
+            appState.intervalSeconds = 0;
+            appState.firstAdjustmentTime = 0;
+            this.clearAppliedStyles(el);
+        },
+
         /** 调整字体大小（累加 increment），并应用至页面 */
         changeFontSize(increment) {
             if (appState.isExcludedSite) return;
             appState.currentAdjustment = appState.currentAdjustment + increment;
-            this.applyFontRecursively(document.body, appState.currentAdjustment);
+            this.applyCurrentState(document.body);
             checkConfigModified();
             UIManager.updateUI();
         }
@@ -1036,6 +1141,19 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
     const UIManager = {
         menuHandles: [],
         panelCache: null,
+
+        /** 关闭浮动面板（保存成功后自动收起） */
+        closeFloatingPanel() {
+            if (appState.panelType !== 'floatingPanel') return;
+            const panelContainer = this.panelCache?.shadowRoot?.querySelector('.NiceFont_panel-container');
+            if (!panelContainer) return;
+            panelContainer.style.display = 'none';
+            appState.isAutoOpened = false;
+            if (this.closeDropdown) {
+                document.removeEventListener('click', this.closeDropdown);
+                this.closeDropdown = null;
+            }
+        },
 
         /** 返回所有命令配置（id、getText、action、displayInPluginPanel 等） */
         getCommandsConfig() {
@@ -1052,7 +1170,7 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
                                 if (!FontManager.supportFonts.includes(newFont)) {
                                     FontManager.supportFonts.splice(FontManager.supportFonts.length - 1, 0, newFont);
                                 }
-                                FontManager.applyFontRecursively(document.body, appState.currentAdjustment);
+                                FontManager.applyCurrentState(document.body);
                                 checkConfigModified();
                                 UIManager.updateUI();
                             }
@@ -1117,7 +1235,7 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
                                     } else {
                                         appState.currentFontFamily = selectedFont;
                                     }
-                                    FontManager.applyFontRecursively(document.body, appState.currentAdjustment);
+                                    FontManager.applyCurrentState(document.body);
                                     checkConfigModified();
                                     UIManager.updateUI();
                                     select.remove();
@@ -1147,7 +1265,7 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
                             if (input !== null) {
                                 const val = FontManager.parseStrokeValue(input.trim());
                                 appState.textStroke = val;
-                                FontManager.applyFontRecursively(document.body, appState.currentAdjustment);
+                                FontManager.applyCurrentState(document.body);
                                 checkConfigModified();
                                 UIManager.updateUI();
                             }
@@ -1167,7 +1285,7 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
                             if (input !== null) {
                                 const val = FontManager.parseShadowValue(input.trim());
                                 appState.textShadow = val;
-                                FontManager.applyFontRecursively(document.body, appState.currentAdjustment);
+                                FontManager.applyCurrentState(document.body);
                                 checkConfigModified();
                                 UIManager.updateUI();
                             }
@@ -1226,42 +1344,14 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
                         if (!isNaN(secs) && secs >= 0) {
                             appState.firstAdjustmentTime = secs;
                             if (secs > 0) {
-                                appState.intervalSeconds = 0;
                                 appState.dynamicAdjustment = false;
-                                checkConfigModified();
                             }
+                            checkConfigModified();
                             if (this.panelCache) {
                                 this.updatePanelContent();
                             }
                         } else {
                             appState.firstAdjustmentTime = 0;
-                        }
-                    },
-                    displayInPluginPanel: true,
-                    displayInFloatingPanel: true
-                },
-                {
-                    id: 'timer-adjustment',
-                    getText: () => {
-                        const statusIcon = appState.intervalSeconds > 0 ? Constants.ENABLED_ICON : Constants.DISABLED_ICON;
-                        const timeText = appState.intervalSeconds > 0 ? `【${appState.intervalSeconds}s】` : '';
-                        return `⏱️ ${t.timerAdjustment}: ${statusIcon}${timeText}`;
-                    },
-                    action: () => {
-                        const input = prompt(t.timerPrompt, appState.intervalSeconds.toString());
-                        const secs = parseInt(input, 10);
-                        if (!isNaN(secs) && secs >= 0) {
-                            appState.intervalSeconds = secs;
-                            if (secs > 0) {
-                                appState.firstAdjustmentTime = 0;
-                                appState.dynamicAdjustment = false;
-                                checkConfigModified();
-                            }
-                            if (this.panelCache) {
-                                this.updatePanelContent();
-                            }
-                        } else {
-                            appState.intervalSeconds = 0;
                         }
                     },
                     displayInPluginPanel: true,
@@ -1278,9 +1368,8 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
                             appState.dynamicAdjustment = !appState.dynamicAdjustment;
                             if (appState.dynamicAdjustment) {
                                 appState.firstAdjustmentTime = 0;
-                                appState.intervalSeconds = 0;
-                                checkConfigModified();
                             }
+                            checkConfigModified();
                             if (this.panelCache) {
                                 this.updatePanelContent();
                             }
@@ -1292,7 +1381,7 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
                 {
                     id: 'exclude-elements',
                     getText: () => {
-                        const maxDisplayLength = 23;
+                        const maxDisplayLength = 40;
                         const selectors = Array.isArray(appState.excludedSelectors) ? appState.excludedSelectors : ['i', 'code', 'code *', 'pre', 'pre *', 'svg', 'canvas', 'kbd', 'samp'];
                         const selectorsText = selectors.join(', ');
                         const displayText = selectorsText.length > maxDisplayLength
@@ -1304,7 +1393,7 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
                         const input = prompt(t.excludeElementsPrompt, appState.excludedSelectors.join(', '));
                         if (input !== null && input.trim()) {
                             if (FontManager.updateExcludedSelectors(input)) {
-                                FontManager.applyFontRecursively(document.body, appState.currentAdjustment);
+                                FontManager.applyCurrentState(document.body);
                                 checkConfigModified();
                                 UIManager.updateUI();
                             } else {
@@ -1335,7 +1424,7 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
                             this.createFloatingPanel();
                             if (this.panelCache && this.panelCache.shadowRoot) {
                                 const shadow = this.panelCache.shadowRoot;
-                                const panelContainer = shadow.querySelector('div');
+                                const panelContainer = shadow.querySelector('.NiceFont_panel-container');
                                 if (panelContainer) {
                                     // 显式切换到浮动面板时始终打开一次；确认框只写入 NiceFont_autoOpenPageMenu，影响后续无配置页的自动弹出
                                     panelContainer.style.display = 'block';
@@ -1485,7 +1574,7 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
                 appState.textStroke = v;
                 span.textContent = v.toFixed(2);
                 if (btn.firstChild) btn.firstChild.textContent = `✏️ ${t.setTextStroke}: ${v > 0 ? v.toFixed(2) : t.none}`;
-                FontManager.applyFontRecursively(document.body, appState.currentAdjustment);
+                FontManager.applyCurrentState(document.body);
                 checkConfigModified();
                 UIManager.updateUI();
             });
@@ -1531,7 +1620,7 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
                 appState.textShadow = v;
                 span.textContent = v.toFixed(2);
                 if (btn.firstChild) btn.firstChild.textContent = `🌑 ${t.setTextShadow}: ${v > 0 ? v.toFixed(2) : t.none}`;
-                FontManager.applyFontRecursively(document.body, appState.currentAdjustment);
+                FontManager.applyCurrentState(document.body);
                 checkConfigModified();
                 UIManager.updateUI();
             });
@@ -1569,7 +1658,7 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
             const scriptName = t.panelTitle;
             const savedPosition = GM_getValue('NiceFont_panelPosition', { top: '50px', right: '20px' });
             const vpW = window.visualViewport?.width ?? document.documentElement.clientWidth;
-            const panelW = 300;
+            const panelW = 360;
             const safeRight = Math.max(0, Math.min(parseFloat(String(savedPosition.right).replace(/px$/, '')) || 20, vpW - panelW));
             const safeTop = savedPosition.top || '50px';
 
@@ -1630,6 +1719,14 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
                     border: 1px solid #ccc !important;
                     box-shadow: 0 2px 10px rgba(0,0,0,0.15);
                 }
+                .NiceFont_panel-container,
+                .NiceFont_panel-container * {
+                    font-family: sans-serif !important;
+                    text-transform: none !important;
+                    letter-spacing: normal !important;
+                    word-spacing: normal !important;
+                    text-indent: 0 !important;
+                }
                 @media (prefers-color-scheme: dark) {
                     .NiceFont_panel-container {
                         background: #1e1e1e !important;
@@ -1668,8 +1765,7 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
                     border-radius: 3px;
                     cursor: pointer;
                     text-align: left;
-                    font-size: 15px !important;
-                    font-weight: bold;
+                    font-size: 14px !important;
                     color: inherit !important;
                     background: transparent !important;
                 }
@@ -1733,7 +1829,11 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
             shadow.appendChild(styleSheet);
             shadow.appendChild(panelContainer);
 
-            this.updatePanelContent();
+            try {
+                this.updatePanelContent();
+            } catch (e) {
+                console.error('[NiceFont] 初始化面板内容失败:', e);
+            }
 
             try {
                 document.documentElement.appendChild(this.panelCache);
@@ -1771,7 +1871,7 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
                             document.documentElement.appendChild(this.panelCache);
                             this.updatePanelContent();
                             const shadow = this.panelCache.shadowRoot;
-                            const panelContainer = shadow.querySelector('div');
+                            const panelContainer = shadow.querySelector('.NiceFont_panel-container');
                             if (panelContainer && appState.isAutoOpened) {
                                 panelContainer.style.display = 'block';
                             }
@@ -1941,7 +2041,7 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
             }
 
             const shadow = this.panelCache.shadowRoot;
-            const panelContainer = shadow.querySelector('div');
+            const panelContainer = shadow.querySelector('.NiceFont_panel-container');
             const isHidden = panelContainer.style.display === 'none';
             const display = isHidden ? 'block' : 'none';
             panelContainer.style.display = display;
@@ -1994,37 +2094,36 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
             clearInterval(appState.timer);
             appState.timer = null;
         }
+        if (appState.firstAdjustmentTimeout) {
+            clearTimeout(appState.firstAdjustmentTimeout);
+            appState.firstAdjustmentTimeout = null;
+        }
         if (appState.observer) {
             appState.observer.disconnect();
             appState.observer = null;
         }
     }
 
-    /** 根据配置启动首次延迟、定时、动态调整（ResizeObserver） */
+    /** 根据配置启动首次延迟、动态调整（ResizeObserver） */
     function setupScheduledAdjustments() {
         cleanupTimersAndObserver();
         if (appState.isExcludedSite || !document.body) return;
         if (appState.currentAdjustment === 0 && appState.currentFontFamily === 'none' && appState.textStroke <= 0 && appState.textShadow <= 0) return;
 
         if (appState.firstAdjustmentTime > 0) {
-            setTimeout(() => {
-                FontManager.applyFontRecursively(document.body, appState.currentAdjustment);
+            appState.firstAdjustmentTimeout = setTimeout(() => {
+                FontManager.applyCurrentState(document.body);
+                appState.firstAdjustmentTimeout = null;
             }, appState.firstAdjustmentTime * 1000);
-        }
-        if (appState.intervalSeconds > 0) {
-            appState.timer = setInterval(() => {
-                FontManager.applyFontRecursively(document.body, appState.currentAdjustment);
-            }, appState.intervalSeconds * 1000);
-        }
-        if (appState.dynamicAdjustment) {
+        } else if (appState.dynamicAdjustment) {
             const throttleTime = document.body.childElementCount > 500 ? 500 : 300;
             appState.observer = new MutationObserver(Utils.throttle(() => {
-                FontManager.applyFontRecursively(document.body, appState.currentAdjustment);
+                FontManager.applyCurrentState(document.body);
             }, throttleTime));
             appState.observer.observe(document.body, { childList: true, subtree: true });
-            FontManager.applyFontRecursively(document.body, appState.currentAdjustment);
-        } else if (!appState.firstAdjustmentTime && !appState.intervalSeconds) {
-            FontManager.applyFontRecursively(document.body, appState.currentAdjustment);
+            FontManager.applyCurrentState(document.body);
+        } else if (!appState.firstAdjustmentTime) {
+            FontManager.applyCurrentState(document.body);
         }
     }
 
@@ -2061,7 +2160,7 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
             showPanel: '显示面板',
             currentConfigScope: '当前配置范围',
             modifyConfigScope: '修改配置范围',
-            modifyConfigScopePrompt: '请输入配置范围：\n0: 排除本站\n1: 子域名 ({hostname})\n2: 顶级域名 ({tld})\n3: 所有网站\n当前范围: {scope}',
+            modifyConfigScopePrompt: '请输入配置范围：\n0: 排除本站 ({hostname})\n1: 匹配本站 ({hostname})\n2: 匹配域名 ({tld})\n3: 匹配所有网站\n当前范围: {scope}',
             exportImportConfig: '导出/导入配置',
             clearAllConfigConfirm: '请输入 y 确认清空所有配置：',
             clearAllConfigLabel: '清空',
@@ -2075,13 +2174,15 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
             saveConfig: '保存配置',
             saveConfigPending: '保存配置（有更改）',
             saveConfigConfirm: '是否保存配置到 {scope} [{target}]？',
+            adjustmentModeRequiredPrompt: '检测到已调整字体，但未启用“首次调整”或“动态调整”。\n请选择启用方式后将直接保存：\n1: 首次调整（默认 3 秒）\n2: 动态调整',
+            adjustmentModeRequiredInvalid: '输入无效，已取消保存。',
             deleteConfigConfirm: '是否删除 {target} 的配置？',
             deleteBeforeScopeChangeConfirm: '更改范围前，是否删除 {scope} [{target}] 的现有配置？',
             notConfigured: '未配置',
             invalidInput: '输入无效，请输入 0、1、2 或 3！',
-            subdomain: '子域名',
-            topLevelDomain: '顶级域名',
-            allWebsites: '所有网站',
+            subdomain: '匹配本站',
+            topLevelDomain: '匹配域名',
+            allWebsites: '匹配所有网站',
             excludeThisSite: '排除本站',
             currentConfigScopeExcluded: '排除本站 ({hostname})',
             customInput: '手动输入',
@@ -2116,7 +2217,7 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
             showPanel: 'Show Panel',
             currentConfigScope: 'Current Configuration Scope',
             modifyConfigScope: 'Modify Configuration Scope',
-            modifyConfigScopePrompt: 'Enter configuration scope:\n0: Exclude this site\n1: Subdomain ({hostname})\n2: Top-Level Domain ({tld})\n3: All Websites\nCurrent scope: {scope}',
+            modifyConfigScopePrompt: 'Enter configuration scope:\n0: Exclude this site ({hostname})\n1: Match this site ({hostname})\n2: Match domain ({tld})\n3: Match all websites\nCurrent scope: {scope}',
             exportImportConfig: 'Export/Import Config',
             clearAllConfigConfirm: 'Enter y to confirm clearing all configurations:',
             clearAllConfigLabel: 'Clear',
@@ -2130,13 +2231,15 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
             saveConfig: 'Save Configuration',
             saveConfigPending: 'Save Configuration (Changes Pending)',
             saveConfigConfirm: 'Save configuration to {scope} [{target}]?',
+            adjustmentModeRequiredPrompt: 'Detected font changes, but neither "First Adjustment" nor "Dynamic Adjustment" is enabled.\nChoose one, then it will save directly:\n1: First Adjustment (default 3 seconds)\n2: Dynamic Adjustment',
+            adjustmentModeRequiredInvalid: 'Invalid input. Save has been cancelled.',
             deleteConfigConfirm: 'Delete configuration for {target}?',
             deleteBeforeScopeChangeConfirm: 'Before changing scope, delete existing configuration for {scope} [{target}]?',
             notConfigured: 'Not Configured',
             invalidInput: 'Invalid input, please enter 0, 1, 2, or 3!',
-            subdomain: 'Subdomain',
-            topLevelDomain: 'Top-Level Domain',
-            allWebsites: 'All Websites',
+            subdomain: 'Match This Site',
+            topLevelDomain: 'Match Domain',
+            allWebsites: 'Match All Websites',
             excludeThisSite: 'Exclude This Site',
             currentConfigScopeExcluded: 'Exclude This Site ({hostname})',
             customInput: 'Manual Input',
@@ -2171,7 +2274,7 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
             showPanel: '패널 표시',
             currentConfigScope: '현재 설정 범위',
             modifyConfigScope: '설정 범위 수정',
-            modifyConfigScopePrompt: '설정 범위를 입력하세요:\n0: 이 사이트 제외\n1: 서브도메인 ({hostname})\n2: 최상위 도메인 ({tld})\n3: 모든 웹사이트\n현재 범위: {scope}',
+            modifyConfigScopePrompt: '설정 범위를 입력하세요:\n0: 이 사이트 제외 ({hostname})\n1: 이 사이트 매칭 ({hostname})\n2: 도메인 매칭 ({tld})\n3: 모든 웹사이트 매칭\n현재 범위: {scope}',
             exportImportConfig: '설정 내보내기/가져오기',
             clearAllConfigConfirm: '초기화하려면 y를 입력하세요:',
             clearAllConfigLabel: '초기화',
@@ -2189,9 +2292,9 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
             deleteBeforeScopeChangeConfirm: '범위 변경 전, {scope} [{target}]의 기존 설정을 삭제하시겠습니까?',
             notConfigured: '설정되지 않음',
             invalidInput: '잘못된 입력입니다. 0, 1, 2, 3 중 하나를 입력하세요!',
-            subdomain: '서브도메인',
-            topLevelDomain: '최상위 도메인',
-            allWebsites: '모든 웹사이트',
+            subdomain: '이 사이트 매칭',
+            topLevelDomain: '도메인 매칭',
+            allWebsites: '모든 웹사이트 매칭',
             excludeThisSite: '이 사이트 제외',
             currentConfigScopeExcluded: '이 사이트 제외 ({hostname})',
             customInput: '수동 입력',
@@ -2226,7 +2329,7 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
             showPanel: 'パネルを表示',
             currentConfigScope: '現在の設定範囲',
             modifyConfigScope: '設定範囲の変更',
-            modifyConfigScopePrompt: '設定範囲を入力してください：\n0: このサイトを除外\n1: サブドメイン ({hostname})\n2: トップレベルドメイン ({tld})\n3: すべてのウェブサイト\n現在の範囲: {scope}',
+            modifyConfigScopePrompt: '設定範囲を入力してください：\n0: このサイトを除外 ({hostname})\n1: このサイトに一致 ({hostname})\n2: ドメインに一致 ({tld})\n3: すべてのウェブサイトに一致\n現在の範囲: {scope}',
             exportImportConfig: '設定のエクスポート/インポート',
             clearAllConfigConfirm: 'クリアするには y を入力してください:',
             clearAllConfigLabel: 'クリア',
@@ -2244,9 +2347,9 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
             deleteBeforeScopeChangeConfirm: '範囲変更前に、{scope} [{target}] の既存の設定を削除しますか？',
             notConfigured: '未設定',
             invalidInput: '無効な入力です。0、1、2、または3を入力してください！',
-            subdomain: 'サブドメイン',
-            topLevelDomain: 'トップレベルドメイン',
-            allWebsites: 'すべてのウェブサイト',
+            subdomain: 'このサイトに一致',
+            topLevelDomain: 'ドメインに一致',
+            allWebsites: 'すべてのウェブサイトに一致',
             excludeThisSite: 'このサイトを除外',
             currentConfigScopeExcluded: 'このサイトを除外 ({hostname})',
             customInput: '手動入力',
@@ -2281,7 +2384,7 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
             showPanel: 'Показать панель',
             currentConfigScope: 'Текущая область настроек',
             modifyConfigScope: 'Изменить область настроек',
-            modifyConfigScopePrompt: 'Введите область настроек:\n0: Исключить этот сайт\n1: Поддомен ({hostname})\n2: Домен верхнего уровня ({tld})\n3: Все веб-сайты\nТекущая область: {scope}',
+            modifyConfigScopePrompt: 'Введите область настроек:\n0: Исключить этот сайт ({hostname})\n1: Совпадение с этим сайтом ({hostname})\n2: Совпадение с доменом ({tld})\n3: Совпадение со всеми сайтами\nТекущая область: {scope}',
             exportImportConfig: 'Экспорт/Импорт настроек',
             clearAllConfigConfirm: 'Введите y для подтверждения очистки всех настроек:',
             clearAllConfigLabel: 'Очистить',
@@ -2299,9 +2402,9 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
             deleteBeforeScopeChangeConfirm: 'Перед изменением области удалить текущие настройки для {scope} [{target}]?',
             notConfigured: 'Не настроено',
             invalidInput: 'Недопустимый ввод, введите 0, 1, 2 или 3!',
-            subdomain: 'Поддомен',
-            topLevelDomain: 'Домен верхнего уровня',
-            allWebsites: 'Все веб-сайты',
+            subdomain: 'Совпадение с этим сайтом',
+            topLevelDomain: 'Совпадение с доменом',
+            allWebsites: 'Совпадение со всеми сайтами',
             excludeThisSite: 'Исключить этот сайт',
             currentConfigScopeExcluded: 'Исключить этот сайт ({hostname})',
             customInput: 'Ручной ввод',
@@ -2336,7 +2439,7 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
             showPanel: 'Afficher le panneau',
             currentConfigScope: 'Portée actuelle de la configuration',
             modifyConfigScope: 'Modifier la portée de la configuration',
-            modifyConfigScopePrompt: 'Entrez la portée de la configuration :\n0 : Exclure ce site\n1 : Sous-domaine ({hostname})\n2 : Domaine de premier niveau ({tld})\n3 : Tous les sites web\nPortée actuelle : {scope}',
+            modifyConfigScopePrompt: 'Entrez la portée de la configuration :\n0 : Exclure ce site ({hostname})\n1 : Correspondre à ce site ({hostname})\n2 : Correspondre au domaine ({tld})\n3 : Correspondre à tous les sites web\nPortée actuelle : {scope}',
             exportImportConfig: 'Exporter/Importer la config',
             clearAllConfigConfirm: 'Entrez y pour confirmer l\'effacement de toutes les configurations :',
             clearAllConfigLabel: 'Effacer',
@@ -2354,9 +2457,9 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
             deleteBeforeScopeChangeConfirm: 'Avant de changer la portée, supprimer la configuration existante pour {scope} [{target}] ?',
             notConfigured: 'Non configuré',
             invalidInput: 'Saisie invalide, veuillez entrer 0, 1, 2 ou 3 !',
-            subdomain: 'Sous-domaine',
-            topLevelDomain: 'Domaine de premier niveau',
-            allWebsites: 'Tous les sites web',
+            subdomain: 'Correspondre à ce site',
+            topLevelDomain: 'Correspondre au domaine',
+            allWebsites: 'Correspondre à tous les sites web',
             excludeThisSite: 'Exclure ce site',
             currentConfigScopeExcluded: 'Exclure ce site ({hostname})',
             customInput: 'Saisie manuelle',
@@ -2391,7 +2494,7 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
             showPanel: 'Panel anzeigen',
             currentConfigScope: 'Aktueller Konfigurationsbereich',
             modifyConfigScope: 'Konfigurationsbereich ändern',
-            modifyConfigScopePrompt: 'Geben Sie den Konfigurationsbereich ein:\n0: Diesen Standort ausschließen\n1: Subdomain ({hostname})\n2: Top-Level-Domain ({tld})\n3: Alle Websites\nAktueller Bereich: {scope}',
+            modifyConfigScopePrompt: 'Geben Sie den Konfigurationsbereich ein:\n0: Diese Website ausschließen ({hostname})\n1: Diese Website abgleichen ({hostname})\n2: Domain abgleichen ({tld})\n3: Alle Websites abgleichen\nAktueller Bereich: {scope}',
             exportImportConfig: 'Konfiguration exportieren/importieren',
             clearAllConfigConfirm: 'Geben Sie y ein, um alle Konfigurationen zu löschen:',
             clearAllConfigLabel: 'Löschen',
@@ -2409,9 +2512,9 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
             deleteBeforeScopeChangeConfirm: 'Vor Änderung des Bereichs bestehende Konfiguration für {scope} [{target}] löschen?',
             notConfigured: 'Nicht konfiguriert',
             invalidInput: 'Ungültige Eingabe, bitte 0, 1, 2 oder 3 eingeben!',
-            subdomain: 'Subdomain',
-            topLevelDomain: 'Top-Level-Domain',
-            allWebsites: 'Alle Websites',
+            subdomain: 'Diese Website abgleichen',
+            topLevelDomain: 'Domain abgleichen',
+            allWebsites: 'Alle Websites abgleichen',
             excludeThisSite: 'Diese Website ausschließen',
             currentConfigScopeExcluded: 'Diese Website ausschließen ({hostname})',
             customInput: 'Manuelle Eingabe',
@@ -2446,7 +2549,7 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
             showPanel: 'Mostrar panel',
             currentConfigScope: 'Alcance actual de la configuración',
             modifyConfigScope: 'Modificar alcance de la configuración',
-            modifyConfigScopePrompt: 'Introduce el alcance de la configuración:\n0: Excluir este sitio\n1: Subdominio ({hostname})\n2: Dominio de primer nivel ({tld})\n3: Todos los sitios web\nAlcance actual: {scope}',
+            modifyConfigScopePrompt: 'Introduce el alcance de la configuración:\n0: Excluir este sitio ({hostname})\n1: Coincidir con este sitio ({hostname})\n2: Coincidir con el dominio ({tld})\n3: Coincidir con todos los sitios web\nAlcance actual: {scope}',
             exportImportConfig: 'Exportar/Importar configuración',
             clearAllConfigConfirm: 'Introduzca y para confirmar el borrado de todas las configuraciones:',
             clearAllConfigLabel: 'Borrar',
@@ -2464,9 +2567,9 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
             deleteBeforeScopeChangeConfirm: 'Antes de cambiar el alcance, ¿eliminar la configuración existente para {scope} [{target}]?',
             notConfigured: 'No configurado',
             invalidInput: '¡Entrada inválida, por favor introduce 0, 1, 2 o 3!',
-            subdomain: 'Subdominio',
-            topLevelDomain: 'Dominio de primer nivel',
-            allWebsites: 'Todos los sitios web',
+            subdomain: 'Coincidir con este sitio',
+            topLevelDomain: 'Coincidir con el dominio',
+            allWebsites: 'Coincidir con todos los sitios web',
             excludeThisSite: 'Excluir este sitio',
             currentConfigScopeExcluded: 'Excluir este sitio ({hostname})',
             customInput: 'Entrada manual',
@@ -2501,7 +2604,7 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
             showPanel: 'Mostrar painel',
             currentConfigScope: 'Escopo atual da configuração',
             modifyConfigScope: 'Modificar escopo da configuração',
-            modifyConfigScopePrompt: 'Insira o escopo da configuração:\n0: Excluir este site\n1: Subdomínio ({hostname})\n2: Domínio de nível superior ({tld})\n3: Todos os sites\nEscopo atual: {scope}',
+            modifyConfigScopePrompt: 'Insira o escopo da configuração:\n0: Excluir este site ({hostname})\n1: Corresponder a este site ({hostname})\n2: Corresponder ao domínio ({tld})\n3: Corresponder a todos os sites\nEscopo atual: {scope}',
             exportImportConfig: 'Exportar/Importar configuração',
             clearAllConfigConfirm: 'Digite y para confirmar a limpeza de todas as configurações:',
             clearAllConfigLabel: 'Limpar',
@@ -2519,9 +2622,9 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
             deleteBeforeScopeChangeConfirm: 'Antes de mudar o escopo, excluir a configuração existente para {scope} [{target}]?',
             notConfigured: 'Não configurado',
             invalidInput: 'Entrada inválida, por favor insira 0, 1, 2 ou 3!',
-            subdomain: 'Subdomínio',
-            topLevelDomain: 'Domínio de nível superior',
-            allWebsites: 'Todos os sites',
+            subdomain: 'Corresponder a este site',
+            topLevelDomain: 'Corresponder ao domínio',
+            allWebsites: 'Corresponder a todos os sites',
             excludeThisSite: 'Excluir este site',
             currentConfigScopeExcluded: 'Excluir este site ({hostname})',
             customInput: 'Entrada manual',
@@ -2555,7 +2658,7 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
                 UIManager.createFloatingPanel();
                 if (UIManager.panelCache) {
                     const shadow = UIManager.panelCache.shadowRoot;
-                    const panelContainer = shadow.querySelector('div');
+                    const panelContainer = shadow.querySelector('.NiceFont_panel-container');
                     panelContainer.style.display = 'block';
                     appState.isAutoOpened = true;
                 }

@@ -16,7 +16,7 @@
 **NiceFont** is a powerful tool to optimize web font display, making browsing clearer, more comfortable, and visually pleasing! "Truly adjusts fonts, not page scaling—settle for nothing less!"
 
 - **Real Font Adjustment**: Say goodbye to page scaling; directly optimize font size and style.
-- **Flexible Configuration**: Save your font settings and easily apply them to every webpage. Supports first-time, scheduled, or dynamic font adjustments, adaptable to subdomains, entire sites, or global settings.
+- **Flexible Configuration**: Save your font settings and apply them to every webpage easily. Supports first-time or dynamic font adjustment, with quick scope control for this site, matched domain, or all websites.
 - **Broad Compatibility**: Supports almost all websites, including Bilibili comment sections, DingTalk online documents, Zhihu, community forums, and more.
 
 If you like this plugin, please give our GitHub project [NiceFont](https://github.com/10D24D/NiceFont) a ⭐ Star to support us!
@@ -29,14 +29,15 @@ If you like this plugin, please give our GitHub project [NiceFont](https://githu
 ## 📑 Main Features
 
 - **🔠 Set Font Type**: Choose from built-in fonts (e.g., SimSun, Microsoft YaHei) or input custom fonts.
+- **✏️ Font Stroke**: Adjust stroke thickness to improve text edge clarity.
+- **🌑 Font Shadow**: Adjust shadow strength to improve visual hierarchy.
 - **📏 Adjust Font Size**: One-click to enlarge/shrink fonts and display current adjustments.
 - **♻️ Restore Fonts**: One-click to restore fonts to their original size and style.
 - **1️⃣ First-Time Adjustment**: Automatically apply font settings after page load, with customizable delay time.
-- **⏱️ Scheduled Adjustment**: Periodically apply font settings at set intervals, suitable for pages with moderate time sensitivity (note: complex pages may experience lag).
 - **🔎 Dynamic Adjustment**: Automatically apply font settings when page content changes, suitable for real-time dynamic pages (note: complex pages may experience lag).
 - **🌐 Multi-Language Support**: Menu supports 9 languages and automatically switches based on browser language.
 - **🚫 Exclude Elements**: Exclude custom CSS selectors and webpage elements.
-- **📍 Current Configuration Scope**: Supports excluding sites or matching subdomains, top-level domains, and all websites for font adjustments (click to delete corresponding configurations as needed).
+- **📍 Current Configuration Scope**: Supports excluding this site, or matching this site / matched domain / all websites for font adjustments (you can delete the corresponding active configuration when needed).
 - **📋 Export/Import Config**: Export all configurations as a JSON file for quick restore on a new computer.
 - **💾 Save Configuration**: Persistently save font adjustment configurations locally, remaining effective upon reopening pages.
 
@@ -48,6 +49,16 @@ If you like this plugin, please give our GitHub project [NiceFont](https://githu
 4. Refresh any webpage, click the extension tool's menu, then open the NiceFont menu to customize fonts 🔠.
 
 ## 📜 Changelog
+
+### v4.3.1 - 2026-03-26
+
+- **Fixes**:
+  - Fixed a bug where saving configuration could fail when scope was set to "Match All Websites".
+  - Fixed a bug where adjusting font size could unintentionally override font family.
+- **Improvements**:
+  - Updated configuration scope wording to reduce ambiguity.
+  - Removed the "Scheduled Adjustment" entry. Legacy `timer` settings are automatically migrated to dynamic adjustment for compatibility.
+  - Added pre-save mode validation: when First/Dynamic is not enabled, users are prompted to choose one before saving to avoid ineffective saved configs.
 
 ### v4.3.0 - 2026-03-24
 
@@ -189,9 +200,9 @@ If you like this plugin, please give our GitHub project [NiceFont](https://githu
   Example copied selector: `#app > div.layout > main > div.editor-wrap > div.toolbar > button:nth-child(3)`. You can usually simplify it to `.toolbar` or `button`. Simpler selectors are often more stable, but may affect a wider range. Prefer class selectors like `.toolbar` first.  
   Common rules: `.hljs, pre, code`, `svg, canvas`, `[contenteditable="true"]`. To revert, remove the corresponding rule in "Current Configuration Scope".
 
-- **How should I choose first-time, scheduled, or dynamic adjustment?**  
-  Choose based on page update frequency: use "First-time" when pages are mostly static; use "Scheduled" when content loads in batches but not continuously; use "Dynamic" for continuously changing pages like comment feeds, chats, or online docs.  
-  If unsure, start with "First-time", then add "Scheduled" if needed, and use "Dynamic" last (best real-time behavior, but highest performance overhead).
+- **How should I choose first-time or dynamic adjustment?**  
+  Choose based on page update frequency: use "First-time" when pages are mostly static; use "Dynamic" for continuously changing pages like comment feeds, chats, or online docs.  
+  If unsure, start with "First-time", then switch to "Dynamic" if real-time updates are still needed (better real-time behavior, with higher performance overhead).
 
 - **What should I do if I encounter issues?**  
   Please submit feedback via [GitHub Issues](https://github.com/10D24D/NiceFont/issues) or [Greasyfork Feedback](https://greasyfork.org/en/scripts/533232-nicefont/feedback); we will resolve them as soon as possible!
