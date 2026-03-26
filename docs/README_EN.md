@@ -50,6 +50,11 @@ If you like this plugin, please give our GitHub project [NiceFont](https://githu
 
 ## 📜 Changelog
 
+### v4.3.2 - 2026-03-26
+
+- **Fixes**:
+  - Solve the problem that the font size in the Shadow-root DOM (such as the comment section of Bilibili) cannot be adjusted after the upgrade of the font application strategy.
+
 ### v4.3.1 - 2026-03-26
 
 - **Fixes**:

@@ -10,7 +10,7 @@
 // @name:de       NiceFont (Schöne Schrift)
 // @name:es       NiceFont (Fuente agradable)
 // @name:pt       NiceFont (Fonte agradável)
-// @version      4.3.1
+// @version      4.3.2
 // @author       DD1024z
 // @description  NiceFont: 是一款优化网页字体显示的工具，让浏览更清晰、舒适！“真正调整字体，而非页面缩放，拒绝将就”！可直接修改网页的字体大小与风格，保存你的字体设置，轻松应用到每个网页，支持首次、定时或动态调整字体，适配子域名、整站或全局设置，几乎兼容所有网站！
 // @description:zh-TW  NiceFont：優化網頁字體顯示的工具，瀏覽更清晰、舒適！「真正調整字體，非頁面縮放，拒絕將就」！直接修改字體大小與風格，儲存設定，輕鬆應用於各網頁，支援首次、定時或動態調整，適配子域名或全局設定，幾乎相容所有網站！
@@ -1003,7 +1003,9 @@ html body [contenteditable="true"][placeholder]:not([data-nicefont-ph-syncing="1
             this.traverseDOM(el, (node) => {
                 this.styleCache.delete(node);
                 const originalStyleAttrBeforeStrip = node.getAttribute('style') ?? '';
-                const useInlineFont = this.hasAuthorInlineFontRelatedStyle(originalStyleAttrBeforeStrip);
+                // Shadow DOM 内部无法稳定复用文档级 class 规则，强制走内联调整以保证生效
+                const inShadowTree = typeof node.getRootNode === 'function' && node.getRootNode() instanceof ShadowRoot;
+                const useInlineFont = inShadowTree || this.hasAuthorInlineFontRelatedStyle(originalStyleAttrBeforeStrip);
                 const styleBeforeStrip = window.getComputedStyle(node);
                 const hadDataDefault = node.hasAttribute('data-fontsize-default-fontsize');
                 const fromClassBeforeStrip = this.parseNicefontSizeClassBase(node);
